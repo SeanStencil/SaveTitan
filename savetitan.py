@@ -76,7 +76,7 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
         "executable_name": executable_name
     }
 
-    config.remove_option(profile_id, "profile_id")  # Remove the 'profile_id' field
+    config.remove_option(profile_id, "profile_id")
 
     with open(file_path, "w") as file:
         config.write(file)
@@ -902,7 +902,7 @@ if args.runprofile:
         profile_id = existing_profiles[0]
         name, local_save_folder, game_executable, save_slot, saves, sync_mode = read_config_file(profile_id)
 
-        game_profile_folder = os.path.join(cloud_storage_path, f"{name}-{profile_id}")
+        game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
 
         if not cloud_storage_path:
             print("Cloud storage path is not configured. Please run the script with the 'global' argument to configure it")

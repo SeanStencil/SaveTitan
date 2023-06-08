@@ -42,6 +42,14 @@ def check_read_permissions(path, file_type):
         return False
     return True
 
+# Check a function's ability to read the file/folder path
+def check_execute_permissions(path, file_type):
+    if not os.access(path, os.X_OK):
+        QMessageBox.critical(None, "Access Denied", 
+                             f"Permission denied to read the {file_type}. Please check the file permissions and try again.")
+        return False
+    return True
+
 # Check a function's ability to write the file/folder path
 def check_write_permissions(path, name):
     if os.access(path, os.W_OK):
@@ -83,6 +91,7 @@ def make_backup_copy(original_folder):
     shutil.copytree(original_folder, backup_folder)
 
 # Function to check and sync saves
+def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id):
     if not os.path.exists(local_save_folder):
         QMessageBox.critical(None, "Save Folder Not Found", "Local save folder does not exist. Please make sure your existing save files are located in the correct folder.")
         return
@@ -90,41 +99,41 @@ def make_backup_copy(original_folder):
         return
     if not check_read_permissions(game_executable, 'Game Executable') or not check_write_permissions(game_executable, 'Game Executable'):
         return
-        config = configparser.ConfigParser()
-        config.read(global_config_file)
-        cloud_storage_path = config.get("Global Settings", "cloud_storage_path")
-        game_profile_folder_save_slot = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
-        if os.path.exists(game_profile_folder_save_slot) and os.listdir(game_profile_folder_save_slot):
-            local_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(local_save_folder))
-            cloud_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(game_profile_folder_save_slot))
+    config = configparser.ConfigParser()
+    config.read(global_config_file)
+    cloud_storage_path = config.get("Global Settings", "cloud_storage_path")
+    game_profile_folder_save_slot = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
+    if os.path.exists(game_profile_folder_save_slot) and os.listdir(game_profile_folder_save_slot):
+        local_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(local_save_folder))
+        cloud_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(game_profile_folder_save_slot))
 
-            comparison = filecmp.dircmp(local_save_folder, game_profile_folder_save_slot)
-            if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-                launch_game(game_executable, save_slot)
-            else:
-                local_save_time_str = local_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
-                cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
-
-                if local_save_time > cloud_save_time:
-                    reply = QMessageBox.question(None, "LOCAL SAVE IS NEWER",
-                                                 f"The local save (last modified: {local_save_time_str}) is newer than the one in cloud storage (last modified: {cloud_save_time_str}). Do you want to keep your local save?",
-                                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                    if reply == QMessageBox.Yes:
-                        launch_game(game_executable, save_slot)
-                    else:
-                        sync_save_local(args.gameprofile)
-                        launch_game(game_executable, save_slot)
-                else:
-                    reply = QMessageBox.question(None, "CLOUD SAVE IS NEWER",
-                                                 f"The cloud save (last modified: {cloud_save_time_str}) is newer than the one in local save (last modified: {local_save_time_str}). Do you want to download your cloud save?",
-                                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                    if reply == QMessageBox.Yes:
-                        sync_save_local(args.gameprofile)
-                        launch_game(game_executable, save_slot)
-                    else:
-                        launch_game(game_executable, save_slot)
-        else:
+        comparison = filecmp.dircmp(local_save_folder, game_profile_folder_save_slot)
+        if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
             launch_game(game_executable, save_slot)
+        else:
+            local_save_time_str = local_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
+            cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
+
+            if local_save_time > cloud_save_time:
+                reply = QMessageBox.question(None, "LOCAL SAVE IS NEWER",
+                                             f"The local save (last modified: {local_save_time_str}) is newer than the one in cloud storage (last modified: {cloud_save_time_str}). Do you want to keep your local save?",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                if reply == QMessageBox.Yes:
+                    launch_game(game_executable, save_slot)
+                else:
+                    sync_save_local(args.runprofile)
+                    launch_game(game_executable, save_slot)
+            else:
+                reply = QMessageBox.question(None, "CLOUD SAVE IS NEWER",
+                                             f"The cloud save (last modified: {cloud_save_time_str}) is newer than the one in local save (last modified: {local_save_time_str}). Do you want to download your cloud save?",
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                if reply == QMessageBox.Yes:
+                    sync_save_local(args.runprofile)
+                    launch_game(game_executable, save_slot)
+                else:
+                    launch_game(game_executable, save_slot)
+    else:
+        launch_game(game_executable, save_slot)
 
 # Function to sync saves (copy local saves to cloud storage)
 def sync_save_cloud(game_profile, save_slot): 
@@ -156,7 +165,7 @@ def launch_game(game_executable, save_slot):
     def handle_dialog_response():
         dialog_result = QMessageBox.information(None, "Game in Progress", "Please click 'I'm done' when you have finished playing.")
         if dialog_result == QMessageBox.Ok:
-            sync_save_cloud(args.gameprofile, save_slot)
+            sync_save_cloud(args.runprofile, save_slot)
 
     QTimer.singleShot(0, handle_dialog_response)
 
@@ -891,7 +900,7 @@ if args.runprofile:
         sys.exit(1)
     else:
         profile_id = existing_profiles[0]
-        name, local_save_folder, game_executable, save_slot, saves, sync_mode, _ = read_config_file(profile_id)
+        name, local_save_folder, game_executable, save_slot, saves, sync_mode = read_config_file(profile_id)
 
         game_profile_folder = os.path.join(cloud_storage_path, f"{name}-{profile_id}")
 

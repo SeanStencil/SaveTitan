@@ -522,6 +522,8 @@ def show_config_dialog(config):
         import_profile_dialog.setFixedSize(491, 301)
 
         def scan_cloud_storage():
+            with open('import_scan.log', 'a') as file:
+                file.truncate(0)
             logging.basicConfig(filename='import_scan.log', filemode='w', level=logging.INFO,
                                 format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -554,6 +556,8 @@ def show_config_dialog(config):
                                 expected_folder_name = f"{profile_id}"
                                 folder_name = os.path.basename(os.path.dirname(file_path))
                                 if folder_name != expected_folder_name:
+                                    new_path = os.path.join(invalid_profiles_dir, folder_name)
+                                    shutil.move(subfolder, new_path)
                                     logging.info(f"Invalid: {file_path} - Incompatible directory name")
                                     continue
 
@@ -579,9 +583,9 @@ def show_config_dialog(config):
                                     elif profile_id_exists:
                                         logging.info(f"Skipped: {file_path} - Profile already added")
                                     else:
-                                        logging.info(f"Invalid: {file_path} - Required fields missing or empty")
                                         new_path = os.path.join(invalid_profiles_dir, os.path.basename(subfolder))
                                         shutil.move(subfolder, new_path)
+                                        logging.info(f"Invalid: {file_path} - Required fields missing or empty")
 
                             else:
                                 logging.info(f"Invalid: {file_path} - Required fields missing or empty")

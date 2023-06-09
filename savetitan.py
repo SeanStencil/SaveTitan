@@ -511,6 +511,7 @@ def show_config_dialog(config):
             added_count = 0
             invalid_count = 0
             can_import_count = 0
+            import_profile_dialog.progressBar.setValue(0)
 
             with open('import_scan.log', 'a') as file:
                 file.truncate(0)

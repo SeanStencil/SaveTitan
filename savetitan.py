@@ -417,17 +417,31 @@ def show_config_dialog(config):
                 elif sys.platform == "darwin":
                     file_filter = "Executable Files (*.app *.command)"
                 else:
-                    file_filter = "Executable Files (*.sh *.AppImage))"
+                    file_filter = "Executable Files (*.sh *.AppImage)"
 
-                game_executable, ok = QFileDialog.getOpenFileName(config_dialog, "Add Profile - Locate the executable for " + profile_name, filter=file_filter)
-                if not ok:
-                    return
+                while True:
+                    game_executable, ok = QFileDialog.getOpenFileName(config_dialog, "Add Profile - Locate the executable for " + profile_name, filter=file_filter)
+                    if not ok:
+                        return
+                    elif game_executable.startswith(cloud_storage_path):
+                        QMessageBox.warning(None, "Executable Location Error",
+                                            "The selected executable is inside the cloud storage path. "
+                                            "Please select an executable outside the cloud storage path.")
+                    else:
+                        break
 
                 executable_name = os.path.basename(game_executable)
 
-                local_save_folder = QFileDialog.getExistingDirectory(config_dialog, "Add Profile - Locate the save folder for " + profile_name, options=QFileDialog.ShowDirsOnly)
-                if not local_save_folder:
-                    return
+                while True:
+                    local_save_folder = QFileDialog.getExistingDirectory(config_dialog, "Add Profile - Locate the save folder for " + profile_name, options=QFileDialog.ShowDirsOnly)
+                    if not local_save_folder:
+                        return
+                    elif local_save_folder.startswith(cloud_storage_path):
+                        QMessageBox.warning(None, "Save Location Error",
+                                            "The selected save folder is inside the cloud storage path. "
+                                            "Please select a save folder outside the cloud storage path.")
+                    else:
+                        break
 
                 profile_id = None
                 while True:
@@ -639,11 +653,22 @@ def show_config_dialog(config):
                 else:
                     file_filter = "Executable Files (*.sh *.AppImage)"
 
-                executable_path, _ = QFileDialog.getOpenFileName(import_profile_dialog,
-                                                                "Import Profile - Locate the executable for " + executable_name,
-                                                                filter=file_filter)
-                if not executable_path:
+                cloud_storage_path = read_global_config()
+                if not cloud_storage_path:
                     return
+
+                while True:
+                    executable_path, _ = QFileDialog.getOpenFileName(import_profile_dialog,
+                                                                    "Import Profile - Locate the executable for " + executable_name,
+                                                                    filter=file_filter)
+                    if not executable_path:
+                        return
+                    elif executable_path.startswith(cloud_storage_path):
+                        QMessageBox.warning(None, "Executable Location Error",
+                                            "The selected executable is inside the cloud storage path. "
+                                            "Please select an executable outside the cloud storage path.")
+                    else:
+                        break
 
                 selected_executable_name = os.path.basename(executable_path)
                 if not selected_executable_name.lower() == executable_name.lower():
@@ -669,11 +694,18 @@ def show_config_dialog(config):
                                                 "Profile import cancelled.")
                             return
 
-                local_save_folder = QFileDialog.getExistingDirectory(import_profile_dialog,
-                                                                    "Import Profile - Locate the save folder for " + profile_name,
-                                                                    options=QFileDialog.ShowDirsOnly)
-                if not local_save_folder:
-                    return
+                while True:
+                    local_save_folder = QFileDialog.getExistingDirectory(import_profile_dialog,
+                                                                        "Import Profile - Locate the save folder for " + profile_name,
+                                                                        options=QFileDialog.ShowDirsOnly)
+                    if not local_save_folder:
+                        return
+                    elif local_save_folder.startswith(cloud_storage_path):
+                        QMessageBox.warning(None, "Save Location Error",
+                                            "The selected save folder is inside the cloud storage path. "
+                                            "Please select a save folder outside the cloud storage path.")
+                    else:
+                        break
 
                 profiles_config = configparser.ConfigParser()
                 profiles_config.read(profiles_config_file)
@@ -696,7 +728,7 @@ def show_config_dialog(config):
                 QMessageBox.information(None, "Success", "Profile imported successfully.")
                 new_row_data = [profile_name, saves, sync_mode, profile_id]
                 configprofileView.model().sourceModel()._data.append(new_row_data)
-                
+
                 configprofileView.model().sourceModel().layoutChanged.emit()
 
                 configprofileView.reset()

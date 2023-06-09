@@ -519,7 +519,7 @@ def show_config_dialog(config):
 
         import_profile_dialog = uic.loadUi("import_profile.ui")
         import_profile_dialog.setWindowFlags(import_profile_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-        import_profile_dialog.setFixedSize(491, 301)
+        import_profile_dialog.setFixedSize(491, 331)
 
         import_profile_dialog.importButton.setEnabled(False)
 
@@ -545,6 +545,8 @@ def show_config_dialog(config):
             subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir() and f.name != "invalid_profiles"]
             invalid_profiles_dir = os.path.join(cloud_storage_path, "invalid_profiles")
             os.makedirs(invalid_profiles_dir, exist_ok=True)
+
+            import_profile_dialog.progressBar.setMaximum(len(subfolders))
 
             for subfolder in subfolders:
                 profile_info_file_path = os.path.join(subfolder, "profile_info.savetitan")
@@ -595,6 +597,10 @@ def show_config_dialog(config):
                 import_profile_dialog.listWidget.addItem(item)
 
                 scanned_count += 1
+
+                import_profile_dialog.progressBar.setValue(import_profile_dialog.progressBar.value() + 1)
+
+            import_profile_dialog.progressBar.setValue(0)
 
             message_box = QMessageBox()
             message_box.setIcon(QMessageBox.Information)

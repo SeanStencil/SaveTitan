@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Re-scan</string>
+    <string>Scan</string>
    </property>
   </widget>
   <widget class="QPushButton" name="closeButton">

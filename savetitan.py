@@ -522,6 +522,10 @@ def show_config_dialog(config):
         import_profile_dialog.setFixedSize(491, 301)
 
         def scan_cloud_storage():
+            scanned_count = 0
+            added_count = 0
+            invalid_count = 0
+
             with open('import_scan.log', 'a') as file:
                 file.truncate(0)
             logging.basicConfig(filename='import_scan.log', filemode='w', level=logging.INFO,
@@ -530,68 +534,79 @@ def show_config_dialog(config):
             import_profile_dialog.listWidget.clear()
 
             cloud_storage_path = read_global_config()
-            if cloud_storage_path:
-                config = configparser.ConfigParser()
-                config.read(profiles_config_file)
+            if not cloud_storage_path:
+                return
 
-                subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir() and f.name != "invalid_profiles"]
-                invalid_profiles_dir = os.path.join(cloud_storage_path, "invalid_profiles")
-                os.makedirs(invalid_profiles_dir, exist_ok=True)
-                for subfolder in subfolders:
-                    savetitan_files = glob.glob(os.path.join(subfolder, "*.savetitan"))
-                    for file_path in savetitan_files:
-                        config_savetitan = configparser.ConfigParser()
-                        config_savetitan.read(file_path)
-                        if config_savetitan.sections():
-                            profile_id = config_savetitan.sections()[0]
+            config = configparser.ConfigParser()
+            config.read(profiles_config_file)
 
-                            required_fields = ['name', 'save_slot', 'saves', 'sync_mode', 'executable_name']
-                            if all(config_savetitan.has_option(profile_id, field) and config_savetitan.get(profile_id, field) for field in required_fields):
-                                profile_name = config_savetitan.get(profile_id, "name")
-                                save_slot = config_savetitan.getint(profile_id, "save_slot")
-                                saves = config_savetitan.getint(profile_id, "saves")
-                                executable_name = config_savetitan.get(profile_id, "executable_name")
-                                sync_mode = config_savetitan.get(profile_id, "sync_mode")
+            subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir() and f.name != "invalid_profiles"]
+            invalid_profiles_dir = os.path.join(cloud_storage_path, "invalid_profiles")
+            os.makedirs(invalid_profiles_dir, exist_ok=True)
 
-                                expected_folder_name = f"{profile_id}"
-                                folder_name = os.path.basename(os.path.dirname(file_path))
-                                if folder_name != expected_folder_name:
-                                    new_path = os.path.join(invalid_profiles_dir, folder_name)
-                                    shutil.move(subfolder, new_path)
-                                    logging.info(f"Invalid: {file_path} - Incompatible directory name")
-                                    continue
+            for subfolder in subfolders:
+                profile_info_file_path = os.path.join(subfolder, "profile_info.savetitan")
+                if not os.path.exists(profile_info_file_path):
+                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    invalid_count += 1
+                    scanned_count += 1
+                    continue
 
-                                if profile_name and 0 < save_slot <= saves:
-                                    profile_id_exists = False
-                                    for section in config.sections():
-                                        existing_profile_id = config.get(section, "profile_id", fallback=None)
-                                        if profile_id == section or profile_id == existing_profile_id:
-                                            profile_id_exists = True
-                                            break
+                config_savetitan = configparser.ConfigParser()
+                config_savetitan.read(profile_info_file_path)
 
-                                    if not profile_id_exists:
-                                        item_text = f"{profile_name} ({executable_name})"
-                                        item = QtWidgets.QListWidgetItem(item_text)
-                                        item.setData(Qt.UserRole, profile_id)
-                                        item.setData(Qt.UserRole + 1, file_path)
-                                        import_profile_dialog.listWidget.addItem(item)
+                if not config_savetitan.sections():
+                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    invalid_count += 1
+                    scanned_count += 1
+                    continue
 
-                                    logging.info(f"Valid profile: {file_path}")
-                                else:
-                                    if save_slot <= 0 or save_slot > saves:
-                                        logging.info(f"Invalid: {file_path} - Value of save_slot higher than the value of saves")
-                                    elif profile_id_exists:
-                                        logging.info(f"Skipped: {file_path} - Profile already added")
-                                    else:
-                                        new_path = os.path.join(invalid_profiles_dir, os.path.basename(subfolder))
-                                        shutil.move(subfolder, new_path)
-                                        logging.info(f"Invalid: {file_path} - Required fields missing or empty")
+                profile_id = config_savetitan.sections()[0]
+                required_fields = ['name', 'save_slot', 'saves', 'sync_mode', 'executable_name']
+                if not all(config_savetitan.has_option(profile_id, field) for field in required_fields):
+                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    invalid_count += 1
+                    scanned_count += 1
+                    continue
 
-                            else:
-                                logging.info(f"Invalid: {file_path} - Required fields missing or empty")
+                expected_folder_name = f"{profile_id}"
+                folder_name = os.path.basename(subfolder)
+                if folder_name != expected_folder_name:
+                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    invalid_count += 1
+                    scanned_count += 1
+                    continue
 
-                                new_path = os.path.join(invalid_profiles_dir, os.path.basename(subfolder))
-                                shutil.move(subfolder, new_path)
+                profile_id_exists = any(profile_id == config.get(section, "profile_id", fallback=None) for section in config.sections())
+
+                if profile_id_exists:
+                    added_count += 1
+                    scanned_count += 1
+                    continue
+
+                profile_name = config_savetitan.get(profile_id, "name")
+                executable_name = config_savetitan.get(profile_id, "executable_name")
+                item_text = f"{profile_name} ({executable_name}) - {profile_id}"
+                item = QtWidgets.QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, profile_id)
+                item.setData(Qt.UserRole + 1, profile_info_file_path)
+                import_profile_dialog.listWidget.addItem(item)
+
+                scanned_count += 1
+
+            message_box = QMessageBox()
+            message_box.setIcon(QMessageBox.Information)
+            message_box.setWindowTitle("Scan Completed")
+            message_box.setText(f"Scan completed.\n\n"
+                                f"Profiles scanned: {scanned_count}\n"
+                                f"Profiles already added: {added_count}\n"
+                                f"Invalid profiles moved to invalid_profiles: {invalid_count}")
+            message_box.exec_()
+
+        def move_to_invalid(invalid_profiles_dir, subfolder):
+            new_path = os.path.join(invalid_profiles_dir, os.path.basename(subfolder))
+            shutil.move(subfolder, new_path)
+            logging.info(f"Invalid: {subfolder}")
 
         def import_selected_profile():
             selected_item = import_profile_dialog.listWidget.currentItem()
@@ -693,8 +708,6 @@ def show_config_dialog(config):
         import_profile_dialog.scanButton.clicked.connect(scan_cloud_storage)
         import_profile_dialog.importButton.clicked.connect(import_selected_profile)
         import_profile_dialog.closeButton.clicked.connect(import_profile_dialog.close)
-
-        scan_cloud_storage()
 
         config_dialog_pos = dialog.pos()
         config_dialog_size = dialog.size()

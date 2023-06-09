@@ -209,7 +209,7 @@ def save_config_file(config):
 
 # Read the global configuration file and retrieve the global settings
 def read_global_config():
-    global cloud_storage_path  # declare that we are using the global variable
+    global cloud_storage_path
     config = configparser.ConfigParser()
     config.read(global_config_file)
     cloud_storage_path = config.get('Global Settings', 'cloud_storage_path', fallback=None)
@@ -529,7 +529,9 @@ def show_config_dialog(config):
         import_dialog_height = import_profile_dialog.frameGeometry().height()
         x = int(config_dialog_pos.x() + (config_dialog_size.width() - import_dialog_width) / 2)
         y = int(config_dialog_pos.y() + (config_dialog_size.height() - import_dialog_height) / 2)
+
         import_profile_dialog.move(x, y)
+        import_profile_dialog.listWidget.setEnabled(False)
 
         def scan_cloud_storage():
             scanned_count = 0
@@ -597,9 +599,11 @@ def show_config_dialog(config):
                     scanned_count += 1
                     continue
 
+                if not import_profile_dialog.listWidget.isEnabled():
+                    import_profile_dialog.listWidget.setEnabled(True)
                 profile_name = config_savetitan.get(profile_id, "name")
                 executable_name = config_savetitan.get(profile_id, "executable_name")
-                item_text = f"{profile_name} ({executable_name}) - {profile_id}"
+                item_text = f"{profile_id} - {profile_name} ({executable_name})"
                 item = QtWidgets.QListWidgetItem(item_text)
                 item.setData(Qt.UserRole, profile_id)
                 item.setData(Qt.UserRole + 1, profile_info_file_path)

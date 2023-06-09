@@ -86,18 +86,38 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
 
     config.remove_option(profile_id, "profile_id")
 
-    with open(file_path, "w") as file:
-        config.write(file)
+    try:
+        with open(file_path, "w") as file:
+            config.write(file)
+    except Exception as e:
+        print(f"Error exporting profile info: {str(e)}")
+        raise Exception("File write error")
 
 
 # Perform backup function prior to sync
 def make_backup_copy(original_folder):
-    backup_folder = original_folder + ".bak"
-    
-    if os.path.exists(backup_folder):
-        shutil.rmtree(backup_folder)
-        
-    shutil.copytree(original_folder, backup_folder)
+    def copy_and_verify():
+        backup_folder = original_folder + ".bak"
+
+        if os.path.exists(backup_folder):
+            shutil.rmtree(backup_folder)
+
+        shutil.copytree(original_folder, backup_folder)
+
+        comparison = dircmp(original_folder, backup_folder)
+        return comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny
+
+    copied = copy_and_verify()
+
+    while not copied:
+        reply = QMessageBox.warning(None, "Backup Error",
+                                    "There was an error making a backup copy. "
+                                    "Please verify the source and destination folders, and try again.",
+                                    QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+        if reply == QMessageBox.Retry:
+            copied = copy_and_verify()
+        else:
+            break
 
 
 # Function to check and sync saves
@@ -150,22 +170,66 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 def sync_save_cloud(game_profile, save_slot): 
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
     
-    if not os.path.exists(save_folder):
-        os.makedirs(save_folder)
-    
-    make_backup_copy(save_folder)
+    def sync_and_verify():
+        try:
+            if not os.path.exists(save_folder):
+                os.makedirs(save_folder)
 
-    shutil.rmtree(save_folder)
-    shutil.copytree(local_save_folder, save_folder)
+            make_backup_copy(save_folder)
+
+            shutil.rmtree(save_folder)
+            shutil.copytree(local_save_folder, save_folder)
+            comparison = dircmp(local_save_folder, save_folder)
+            return comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny
+
+        except Exception as e:
+            QMessageBox.critical(None, "Sync Error", 
+                                 f"An error occurred during the sync process: {str(e)}")
+            return False
+
+    synced = sync_and_verify()
+
+    while not synced:
+        reply = QMessageBox.warning(None, "Sync Error",
+                                    "There was an error syncing saves to cloud storage. "
+                                    "Please verify the source and destination folders, and try again.",
+                                    QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+        if reply == QMessageBox.Retry:
+            synced = sync_and_verify()
+        else:
+            break
+
 
 
 # Function to sync saves (copy Cloud saves to local storage)
 def sync_save_local(game_profile):
+    def sync_and_verify():
+        try:
+            make_backup_copy(local_save_folder)
 
-    make_backup_copy(local_save_folder)
+            shutil.rmtree(local_save_folder)
+            shutil.copytree(game_profile_folder, local_save_folder)
 
-    shutil.rmtree(local_save_folder)
-    shutil.copytree(game_profile_folder, local_save_folder)
+            comparison = dircmp(game_profile_folder, local_save_folder)
+            return comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny
+
+        except Exception as e:
+            QMessageBox.critical(None, "Sync Error", 
+                                 f"An error occurred during the sync process: {str(e)}")
+            return False
+
+    synced = sync_and_verify()
+
+    while not synced:
+        reply = QMessageBox.warning(None, "Sync Error",
+                                    "There was an error syncing saves from cloud storage. "
+                                    "Please verify the source and destination folders, and try again.",
+                                    QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+        if reply == QMessageBox.Retry:
+            synced = sync_and_verify()
+        else:
+            break
+
 
 
 # Function to launch the game
@@ -250,9 +314,13 @@ def set_cloud_storage_path():
         if not savetitan_files_found:
             if len(os.listdir(cloud_storage_path)) > 0:
                 response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
-                                               "WARNING: The selected cloud storage path is not empty. Choose another directory?",
+                                               "WARNING: The selected cloud storage path is not empty. "
+                                               "Would you like to create a new SaveTitan directory in it?",
                                                QMessageBox.Yes | QMessageBox.No)
                 if response == QMessageBox.Yes:
+                    cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
+                    os.makedirs(cloud_storage_path, exist_ok=True)
+                else:
                     continue
 
         config = configparser.ConfigParser()
@@ -476,26 +544,33 @@ def show_config_dialog(config):
                 saves = 1
                 sync_mode = "Sync"
 
-                config[profile_id] = {
-                    "name": profile_name,
-                    "local_save_folder": local_save_folder,
-                    "game_executable": game_executable,
-                    "save_slot": str(save_slot),
-                    "saves": str(saves),
-                    "sync_mode": sync_mode,
-                }
-                save_config_file(config)
-
-                new_row_data = [profile_name, str(saves), sync_mode, profile_id]
-                configprofileView.model().sourceModel()._data.append(new_row_data)
-
-                configprofileView.model().sourceModel().layoutChanged.emit()
-
-                configprofileView.reset()
-
                 profile_folder = os.path.join(cloud_storage_path, profile_id)
                 os.makedirs(profile_folder, exist_ok=True)
-                export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name)
+                try:
+                    export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name)
+
+                    config[profile_id] = {
+                        "name": profile_name,
+                        "local_save_folder": local_save_folder,
+                        "game_executable": game_executable,
+                        "save_slot": str(save_slot),
+                        "saves": str(saves),
+                        "sync_mode": sync_mode,
+                    }
+                    save_config_file(config)
+
+                    new_row_data = [profile_name, str(saves), sync_mode, profile_id]
+                    configprofileView.model().sourceModel()._data.append(new_row_data)
+
+                    configprofileView.model().sourceModel().layoutChanged.emit()
+
+                    configprofileView.reset()
+
+                except Exception as e:
+                    print(f"Error adding profile: {str(e)}")
+                    QMessageBox.warning(None, "Profile Creation Error",
+                                        "There was an error creating the profile. The operation has been aborted.",
+                                        QMessageBox.Ok)
 
 
     # Function to remove a profile

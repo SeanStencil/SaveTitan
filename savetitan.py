@@ -12,6 +12,7 @@ import sys
 import glob
 import stat
 import logging
+
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog
 from PyQt5.QtGui import QIcon
@@ -353,7 +354,16 @@ def show_config_dialog(config):
     global dialog
     dialog = uic.loadUi("config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-    dialog.setFixedSize(dialog.size())
+    
+    # Get the DPI scaling factor
+    app = QApplication.instance()
+    screen = app.screens()[0]
+    dpiScaling = screen.logicalDotsPerInch() / 96.0
+    
+    # Adjust the size of the dialog based on the DPI scaling factor
+    width = int(dialog.width() * dpiScaling)
+    height = int(dialog.height() * dpiScaling)
+    dialog.setFixedSize(width, height)
     
     def load_data_into_model_data():
         profiles_config = configparser.ConfigParser()
@@ -590,8 +600,12 @@ def show_config_dialog(config):
                     with open(profiles_config_file, 'w') as configfile:
                         config.write(configfile)
 
-                    configprofileView.model().sourceModel()._data.pop(selected_index.row())
-                    configprofileView.model().layoutChanged.emit()
+                    source_model = configprofileView.model().sourceModel()
+                    row_to_remove = selected_index.row()
+
+                    source_model.beginRemoveRows(QModelIndex(), row_to_remove, row_to_remove)
+                    source_model._data.pop(row_to_remove)
+                    source_model.endRemoveRows()
                 else:
                     QMessageBox.warning(None, "Profile Not Found", f"The profile '{selected_profile}' was not found in the configuration file.")
             else:
@@ -1077,6 +1091,8 @@ def show_config_dialog(config):
 parser = argparse.ArgumentParser()
 parser.add_argument("-runprofile", help="Specify the game profile to be used")
 args = parser.parse_args()
+
+QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
 app = QApplication([])
 

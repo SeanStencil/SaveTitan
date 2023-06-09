@@ -67,6 +67,23 @@ def check_write_permissions(path, name):
                              f"Permission denied to write to the {name}. Please check the file permissions and try again.")
         return False
 
+# Try and wake up the network location
+def network_share_accessible(path):
+    if os.path.exists(path):
+        return True
+    else:
+        parent_dir = os.path.dirname(path)
+        if os.path.exists(parent_dir):
+            return True
+        else:
+            try:
+                os.listdir(parent_dir)
+                return os.path.exists(parent_dir)
+            except Exception as e:
+                QMessageBox.critical(None, "Network Error",
+                                     f"An error occurred while trying to access the network share: {str(e)}")
+                return False
+
 
 # Export a .savetitan file for the profile folder in cloud storage
 def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name):
@@ -154,7 +171,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                 if reply == QMessageBox.Yes:
                     launch_game(game_executable, save_slot)
                 else:
-                    sync_save_local(args.runprofile)
+                    sync_save_local(game_profile_folder_save_slot, local_save_folder)
                     launch_game(game_executable, save_slot)
             else:
                 reply = QMessageBox.question(None, "CLOUD SAVE IS NEWER",
@@ -171,12 +188,13 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 
 # Function to sync saves (copy local saves to cloud storage)
 def sync_save_cloud(game_profile, save_slot): 
+    print("LOCAL TO CLOUD SYNC CALLED")
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
-    
+    if not network_share_accessible(save_folder):
+        return
     while True:
         try:
-            if not os.path.exists(save_folder):
-                os.makedirs(save_folder)
+            os.makedirs(save_folder, exist_ok=True)
 
             make_backup_copy(save_folder)
 
@@ -199,19 +217,23 @@ def sync_save_cloud(game_profile, save_slot):
                 break
 
 
-# Function to sync saves (copy Cloud saves to local storage)
-def sync_save_local(game_profile):
+def sync_save_local(source_folder, destination_folder):
+    print("CLOUD TO LOCAL SYNC CALLED")
+    if not network_share_accessible(destination_folder):
+        return
     while True:
         try:
-            make_backup_copy(local_save_folder)
+            os.makedirs(destination_folder, exist_ok=True)
 
-            shutil.rmtree(local_save_folder)
-            shutil.copytree(game_profile_folder, local_save_folder)
+            make_backup_copy(destination_folder)
 
-            comparison = filecmp.dircmp(game_profile_folder, local_save_folder)
+            shutil.rmtree(destination_folder)
+            shutil.copytree(source_folder, destination_folder)
+
+            comparison = filecmp.dircmp(source_folder, destination_folder)
 
             if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-                match, mismatch, errors = filecmp.cmpfiles(game_profile_folder, local_save_folder, comparison.common_files)
+                match, mismatch, errors = filecmp.cmpfiles(source_folder, destination_folder, comparison.common_files)
                 if len(mismatch) == 0 and len(errors) == 0:
                     break
             else:

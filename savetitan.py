@@ -17,15 +17,19 @@ from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel
 
+
 # Get the script's directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 # Define the config file path
 profiles_config_file = os.path.join(script_dir, "profiles.ini")
 global_config_file = os.path.join(script_dir, "global.ini")
 
+
 # Define Global Variables
 global cloud_storage_path
+
 
 # Generate a 16 character string for use for profile_id's
 def generate_id():
@@ -33,6 +37,7 @@ def generate_id():
     id_length = 16
     random_id = ''.join(random.choices(characters, k=id_length))
     return random_id
+
 
 # Check a function's ability to read the file/folder path
 def check_read_permissions(path, file_type):
@@ -42,6 +47,7 @@ def check_read_permissions(path, file_type):
         return False
     return True
 
+
 # Check a function's ability to read the file/folder path
 def check_execute_permissions(path, file_type):
     if not os.access(path, os.X_OK):
@@ -49,6 +55,7 @@ def check_execute_permissions(path, file_type):
                              f"Permission denied to read the {file_type}. Please check the file permissions and try again.")
         return False
     return True
+
 
 # Check a function's ability to write the file/folder path
 def check_write_permissions(path, name):
@@ -58,6 +65,7 @@ def check_write_permissions(path, name):
         QMessageBox.critical(None, "Access Denied",
                              f"Permission denied to write to the {name}. Please check the file permissions and try again.")
         return False
+
 
 # Export a .savetitan file for the profile folder in cloud storage
 def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name):
@@ -81,6 +89,7 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
     with open(file_path, "w") as file:
         config.write(file)
 
+
 # Perform backup function prior to sync
 def make_backup_copy(original_folder):
     backup_folder = original_folder + ".bak"
@@ -89,6 +98,7 @@ def make_backup_copy(original_folder):
         shutil.rmtree(backup_folder)
         
     shutil.copytree(original_folder, backup_folder)
+
 
 # Function to check and sync saves
 def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id):
@@ -135,6 +145,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
     else:
         launch_game(game_executable, save_slot)
 
+
 # Function to sync saves (copy local saves to cloud storage)
 def sync_save_cloud(game_profile, save_slot): 
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
@@ -147,6 +158,7 @@ def sync_save_cloud(game_profile, save_slot):
     shutil.rmtree(save_folder)
     shutil.copytree(local_save_folder, save_folder)
 
+
 # Function to sync saves (copy Cloud saves to local storage)
 def sync_save_local(game_profile):
 
@@ -154,6 +166,7 @@ def sync_save_local(game_profile):
 
     shutil.rmtree(local_save_folder)
     shutil.copytree(game_profile_folder, local_save_folder)
+
 
 # Function to launch the game
 def launch_game(game_executable, save_slot):
@@ -168,6 +181,7 @@ def launch_game(game_executable, save_slot):
             sync_save_cloud(args.runprofile, save_slot)
 
     QTimer.singleShot(0, handle_dialog_response)
+
 
 # Read the profiles configuration file and retrieve the profile information
 def read_config_file(profile):
@@ -191,6 +205,7 @@ def read_config_file(profile):
 
     return name, local_save_folder, game_executable, save_slot, saves, sync_mode
 
+
 # Save the profiles configuration file with updated profile information
 def save_config_file(config):
     field_order = ["name", "game_executable", "local_save_folder", "saves", "save_slot", "sync_mode"]
@@ -207,6 +222,7 @@ def save_config_file(config):
     with open(profiles_config_file, "w") as file:
         ordered_config.write(file)
 
+
 # Read the global configuration file and retrieve the global settings
 def read_global_config():
     global cloud_storage_path
@@ -214,6 +230,7 @@ def read_global_config():
     config.read(global_config_file)
     cloud_storage_path = config.get('Global Settings', 'cloud_storage_path', fallback=None)
     return cloud_storage_path
+
 
 # Function to set the cloud storage location
 def set_cloud_storage_path():
@@ -247,6 +264,7 @@ def set_cloud_storage_path():
     dialog.addButton.setEnabled(True)
     dialog.importButton.setEnabled(True)
 
+
 def center_dialog_over_dialog(first_dialog, second_dialog):
     def move_second_dialog_to_center():
         first_dialog_size = first_dialog.size()
@@ -259,6 +277,7 @@ def center_dialog_over_dialog(first_dialog, second_dialog):
         second_dialog.move(x, y)
 
     QTimer.singleShot(0, move_second_dialog_to_center)
+
 
 # Function to show config dialog
 def show_config_dialog(config):
@@ -311,6 +330,7 @@ def show_config_dialog(config):
             flags = super(TableModel, self).flags(index)
             flags |= Qt.ItemIsEditable
             return flags
+
 
     configprofileView = dialog.findChild(QtWidgets.QTableView, "configprofileView")
 
@@ -366,6 +386,7 @@ def show_config_dialog(config):
             dialog.actionRemoveProfile.setEnabled(False)
             dialog.actionImportProfile.setEnabled(False)
 
+
     # Open global settings dialog
     def global_settings_dialog():
         global_settings_dialog = QtWidgets.QDialog()
@@ -383,6 +404,7 @@ def show_config_dialog(config):
         center_dialog_over_dialog(dialog, global_settings_dialog)
 
         global_settings_dialog.exec_()
+
 
     # Function to add a profile
     def add_profile():
@@ -474,6 +496,7 @@ def show_config_dialog(config):
                 os.makedirs(profile_folder, exist_ok=True)
                 export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name)
 
+
     # Function to remove a profile
     def remove_profile():
         selected_index = configprofileView.selectionModel().currentIndex()
@@ -500,6 +523,7 @@ def show_config_dialog(config):
         else:
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to remove.")
 
+
     # Function to open import profile dialog
     def import_profile_dialog():
         cloud_storage_path = read_global_config()
@@ -520,6 +544,7 @@ def show_config_dialog(config):
 
         import_profile_dialog.listWidget.setEnabled(False)
 
+
         def write_to_log(invalid_profiles_path, subfolder, reason):
             # Check if subfolder already logged
             with open(invalid_profiles_path, 'r') as file:
@@ -531,6 +556,7 @@ def show_config_dialog(config):
             # If not found, write to log
             with open(invalid_profiles_path, 'a') as file:
                 file.write(f"{subfolder}, {reason}\n")
+
 
         def scan_cloud_storage():
             scanned_count = 0
@@ -625,10 +651,12 @@ def show_config_dialog(config):
             center_dialog_over_dialog(import_profile_dialog, message_box)
             message_box.exec_()
 
+
         def move_to_invalid(invalid_profiles_dir, subfolder):
             new_path = os.path.join(invalid_profiles_dir, os.path.basename(subfolder))
             shutil.move(subfolder, new_path)
             logging.info(f"Invalid: {subfolder}")
+
 
         def import_selected_profile():
             selected_item = import_profile_dialog.listWidget.currentItem()
@@ -741,7 +769,8 @@ def show_config_dialog(config):
         import_profile_dialog.listWidget.currentItemChanged.connect(lambda: import_profile_dialog.importButton.setEnabled(True if import_profile_dialog.listWidget.currentItem() else False))
 
         import_profile_dialog.exec_()
-        
+       
+       
     # Show the about dialog window
     def about_dialog():
         about = QMessageBox()
@@ -750,7 +779,10 @@ def show_config_dialog(config):
         about.setText("SaveTitan\n\nSaveTitan is a game save management tool that allows you to sync your game saves between local storage and cloud storage.\n\nDeveloped by Sean Bowman")
         about.exec_()
 
+
     def update_executable():
+        cloud_storage_path = read_global_config()
+
         selected_index = configprofileView.currentIndex()
         if not selected_index.isValid():
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to edit.")
@@ -772,12 +804,25 @@ def show_config_dialog(config):
         else:
             file_filter = "Executable Files (*.sh *.AppImage)"
 
-        filepath, _ = QFileDialog.getOpenFileName(None, f"Edit Profile - Locate the executable for {profile_name}", filter=file_filter)
+        while True:
+            filepath, _ = QFileDialog.getOpenFileName(None, f"Edit Profile - Locate the executable for {profile_name}", filter=file_filter)
 
-        if filepath:
-            dialog.executableField.setText(filepath)
+            if not filepath:  # If the user cancelled the dialog
+                return
+
+            if filepath.startswith(cloud_storage_path):
+                QMessageBox.warning(None, "Executable Location Error",
+                                    "The selected executable is inside the cloud storage path. "
+                                    "Please select an executable outside the cloud storage path.")
+            else:
+                break
+
+        dialog.executableField.setText(filepath)
+
 
     def update_local_save_folder():
+        cloud_storage_path = read_global_config()
+
         selected_index = configprofileView.currentIndex()
         if not selected_index.isValid():
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to edit.")
@@ -792,10 +837,21 @@ def show_config_dialog(config):
             QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
             return
 
-        save_folder = QFileDialog.getExistingDirectory(None, f"Edit Profile - Locate the save folder for {profile_name}", options=QFileDialog.ShowDirsOnly)
-        
-        if save_folder:
-            dialog.saveField.setText(save_folder)
+        while True:
+            save_folder = QFileDialog.getExistingDirectory(None, f"Edit Profile - Locate the save folder for {profile_name}", options=QFileDialog.ShowDirsOnly)
+            
+            if not save_folder:  # If the user cancelled the dialog
+                return
+
+            if save_folder.startswith(cloud_storage_path):
+                QMessageBox.warning(None, "Save Location Error",
+                                    "The selected save folder is inside the cloud storage path. "
+                                    "Please select a save folder outside the cloud storage path.")
+            else:
+                break
+
+        dialog.saveField.setText(save_folder)
+
 
     def update_saveslot_combo():
         selected_index = configprofileView.currentIndex()
@@ -818,6 +874,7 @@ def show_config_dialog(config):
             dialog.saveslotCombo.addItem(item_text)
         
         dialog.saveslotCombo.setCurrentIndex(int(save_slot) - 1)
+
 
     def update_fields(index):
         if index.isValid():
@@ -846,6 +903,7 @@ def show_config_dialog(config):
                     dialog.saveslotCombo.setCurrentIndex(combo_index)
             except Exception as e:
                 return
+
 
     def save_profile_fields():
         selected_index = configprofileView.currentIndex()
@@ -918,6 +976,7 @@ def show_config_dialog(config):
     dialog.actionAbout.triggered.connect(about_dialog)
 
     dialog.show()
+
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser()

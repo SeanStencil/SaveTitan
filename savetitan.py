@@ -527,6 +527,7 @@ def show_config_dialog(config):
             scanned_count = 0
             added_count = 0
             invalid_count = 0
+            can_import_count = 0
 
             with open('import_scan.log', 'a') as file:
                 file.truncate(0)
@@ -595,7 +596,7 @@ def show_config_dialog(config):
                 item.setData(Qt.UserRole, profile_id)
                 item.setData(Qt.UserRole + 1, profile_info_file_path)
                 import_profile_dialog.listWidget.addItem(item)
-
+                can_import_count += 1
                 scanned_count += 1
 
                 import_profile_dialog.progressBar.setValue(import_profile_dialog.progressBar.value() + 1)
@@ -608,7 +609,9 @@ def show_config_dialog(config):
             message_box.setText(f"Scan completed.\n\n"
                                 f"Profiles scanned: {scanned_count}\n"
                                 f"Profiles already added: {added_count}\n"
-                                f"Invalid profiles moved to invalid_profiles: {invalid_count}")
+                                f"Invalid profiles moved to invalid_profiles: {invalid_count}\n"
+                                f"\n"
+                                f"Profiles available for import: {can_import_count}")
             message_box.exec_()
 
         def move_to_invalid(invalid_profiles_dir, subfolder):

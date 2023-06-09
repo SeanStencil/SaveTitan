@@ -506,12 +506,26 @@ def show_config_dialog(config):
 
         import_profile_dialog.listWidget.setEnabled(False)
 
+        def write_to_log(invalid_profiles_path, subfolder, reason):
+            # Check if subfolder already logged
+            with open(invalid_profiles_path, 'r') as file:
+                lines = file.readlines()
+                for line in lines:
+                    if subfolder in line:
+                        return  # If found, don't write again
+
+            # If not found, write to log
+            with open(invalid_profiles_path, 'a') as file:
+                file.write(f"{subfolder}, {reason}\n")
+
         def scan_cloud_storage():
             scanned_count = 0
             added_count = 0
             invalid_count = 0
             can_import_count = 0
             import_profile_dialog.progressBar.setValue(0)
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))
 
             with open('import_scan.log', 'a') as file:
                 file.truncate(0)
@@ -527,19 +541,19 @@ def show_config_dialog(config):
             config = configparser.ConfigParser()
             config.read(profiles_config_file)
 
-            subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir() and f.name != "invalid_profiles"]
-            invalid_profiles_dir = os.path.join(cloud_storage_path, "invalid_profiles")
-            os.makedirs(invalid_profiles_dir, exist_ok=True)
+            subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
+            invalid_profiles_path = os.path.join(script_dir, "invalid_profiles.log")
+            if not os.path.isfile(invalid_profiles_path):
+                open(invalid_profiles_path, 'a').close()
 
-            invalid_profiles_dir_exists = os.path.exists(invalid_profiles_dir)
-            total_subfolders = len(subfolders) - 1 if invalid_profiles_dir_exists else len(subfolders)
+            total_subfolders = len(subfolders)
             import_profile_dialog.progressBar.setMaximum(total_subfolders - 1)
 
             for subfolder in subfolders:
                 profile_info_file_path = os.path.join(subfolder, "profile_info.savetitan")
                 import_profile_dialog.progressBar.setValue(import_profile_dialog.progressBar.value() + 1)
                 if not os.path.exists(profile_info_file_path):
-                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    write_to_log(invalid_profiles_path, subfolder, "Profile info not found")
                     invalid_count += 1
                     scanned_count += 1
                     continue
@@ -548,7 +562,7 @@ def show_config_dialog(config):
                 config_savetitan.read(profile_info_file_path)
 
                 if not config_savetitan.sections():
-                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    write_to_log(invalid_profiles_path, subfolder, "Config sections not found")
                     invalid_count += 1
                     scanned_count += 1
                     continue
@@ -556,7 +570,7 @@ def show_config_dialog(config):
                 profile_id = config_savetitan.sections()[0]
                 required_fields = ['name', 'save_slot', 'saves', 'sync_mode', 'executable_name']
                 if not all(config_savetitan.has_option(profile_id, field) for field in required_fields):
-                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    write_to_log(invalid_profiles_path, subfolder, "Missing required fields")
                     invalid_count += 1
                     scanned_count += 1
                     continue
@@ -564,7 +578,7 @@ def show_config_dialog(config):
                 expected_folder_name = f"{profile_id}"
                 folder_name = os.path.basename(subfolder)
                 if folder_name != expected_folder_name:
-                    move_to_invalid(invalid_profiles_dir, subfolder)
+                    write_to_log(invalid_profiles_path, subfolder, "Folder name mismatch")
                     invalid_count += 1
                     scanned_count += 1
                     continue
@@ -597,7 +611,7 @@ def show_config_dialog(config):
                 message += f"Profiles already added: {added_count}<br>"
             if invalid_count > 0:
                 message += f"<br><font color='red'><b>Invalid profiles: {invalid_count}</b></font><br>"
-                message += f"<font color='red'>(Moved to &lt;Cloud Storage Path&gt;/invalid_profiles)</font><br><br>"
+                message += f"<font color='red'>(Logged to invalid_profiles.log)</font><br><br>"
             message += f"\nProfiles available for import: {can_import_count}"
             message_box.setTextFormat(Qt.RichText)
             message_box.setText(message)

@@ -616,15 +616,15 @@ def show_config_dialog(config):
             message_box = QMessageBox()
             message_box.setIcon(QMessageBox.Information)
             message_box.setWindowTitle("Scan Completed")
-            message_box.setText(f"Scan completed.\n\n"
-                                f"Profiles scanned: {scanned_count}\n"
-                                f"Profiles already added: {added_count}\n"
-                                f"Invalid profiles moved to invalid_profiles: {invalid_count}\n"
-                                f"\n"
-                                f"Profiles available for import: {can_import_count}")
-
+            message = f"Scan completed.\n\n" \
+                      f"Profiles scanned: {scanned_count}\n"
+            if added_count > 0:
+                message += f"Profiles already added: {added_count}\n"
+            if invalid_count > 0:
+                message += f"Invalid profiles (Moved to ../invalid_profiles): {invalid_count}\n"
+            message += f"\nProfiles available for import: {can_import_count}"
+            message_box.setText(message)
             center_dialog_over_dialog(import_profile_dialog, message_box)
-
             message_box.exec_()
 
         def move_to_invalid(invalid_profiles_dir, subfolder):

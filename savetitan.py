@@ -791,6 +791,18 @@ def show_config_dialog(config):
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[3]
 
+        config = configparser.ConfigParser()
+        config.read(profiles_config_file)
+
+        try:
+            profile_name = config.get(profile_id, "name")
+        except configparser.NoOptionError:
+            QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
+            return
+
+        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
+        profile_id = selected_row_data[3]
+
         try:
             profile_name = config.get(profile_id, "name")
         except configparser.NoOptionError:
@@ -807,7 +819,7 @@ def show_config_dialog(config):
         while True:
             filepath, _ = QFileDialog.getOpenFileName(None, f"Edit Profile - Locate the executable for {profile_name}", filter=file_filter)
 
-            if not filepath:  # If the user cancelled the dialog
+            if not filepath:
                 return
 
             if filepath.startswith(cloud_storage_path):
@@ -831,6 +843,9 @@ def show_config_dialog(config):
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[3]
 
+        config = configparser.ConfigParser()
+        config.read(profiles_config_file)
+
         try:
             profile_name = config.get(profile_id, "name")
         except configparser.NoOptionError:
@@ -840,7 +855,7 @@ def show_config_dialog(config):
         while True:
             save_folder = QFileDialog.getExistingDirectory(None, f"Edit Profile - Locate the save folder for {profile_name}", options=QFileDialog.ShowDirsOnly)
             
-            if not save_folder:  # If the user cancelled the dialog
+            if not save_folder:
                 return
 
             if save_folder.startswith(cloud_storage_path):

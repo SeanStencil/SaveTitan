@@ -252,7 +252,7 @@ def show_config_dialog(config):
     global dialog
     dialog = uic.loadUi("config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-    dialog.setFixedSize(671, 533)
+    dialog.setFixedSize(dialog.size())
 
     class TableModel(QtCore.QAbstractTableModel):
         def __init__(self, data, headers):
@@ -519,9 +519,17 @@ def show_config_dialog(config):
 
         import_profile_dialog = uic.loadUi("import_profile.ui")
         import_profile_dialog.setWindowFlags(import_profile_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-        import_profile_dialog.setFixedSize(491, 331)
-
+        import_profile_dialog.setFixedSize(import_profile_dialog.size())
         import_profile_dialog.importButton.setEnabled(False)
+
+        config_dialog_pos = dialog.pos()
+        config_dialog_size = dialog.size()
+
+        import_dialog_width = import_profile_dialog.frameGeometry().width()
+        import_dialog_height = import_profile_dialog.frameGeometry().height()
+        x = int(config_dialog_pos.x() + (config_dialog_size.width() - import_dialog_width) / 2)
+        y = int(config_dialog_pos.y() + (config_dialog_size.height() - import_dialog_height) / 2)
+        import_profile_dialog.move(x, y)
 
         def scan_cloud_storage():
             scanned_count = 0
@@ -719,18 +727,7 @@ def show_config_dialog(config):
         import_profile_dialog.scanButton.clicked.connect(scan_cloud_storage)
         import_profile_dialog.importButton.clicked.connect(import_selected_profile)
         import_profile_dialog.closeButton.clicked.connect(import_profile_dialog.close)
-
         import_profile_dialog.listWidget.currentItemChanged.connect(lambda: import_profile_dialog.importButton.setEnabled(True if import_profile_dialog.listWidget.currentItem() else False))
-
-        config_dialog_pos = dialog.pos()
-        config_dialog_size = dialog.size()
-
-        import_dialog_width = import_profile_dialog.frameGeometry().width()
-        import_dialog_height = import_profile_dialog.frameGeometry().height()
-        x = int(config_dialog_pos.x() + (config_dialog_size.width() - import_dialog_width) / 2)
-        y = int(config_dialog_pos.y() + (config_dialog_size.height() - import_dialog_height) / 2)
-
-        import_profile_dialog.move(x, y)
 
         import_profile_dialog.exec_()
         

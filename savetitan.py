@@ -521,6 +521,8 @@ def show_config_dialog(config):
         import_profile_dialog.setWindowFlags(import_profile_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         import_profile_dialog.setFixedSize(491, 301)
 
+        import_profile_dialog.importButton.setEnabled(False)
+
         def scan_cloud_storage():
             scanned_count = 0
             added_count = 0
@@ -577,7 +579,7 @@ def show_config_dialog(config):
                     scanned_count += 1
                     continue
 
-                profile_id_exists = any(profile_id == config.get(section, "profile_id", fallback=None) for section in config.sections())
+                profile_id_exists = profile_id in config.sections()
 
                 if profile_id_exists:
                     added_count += 1
@@ -708,6 +710,8 @@ def show_config_dialog(config):
         import_profile_dialog.scanButton.clicked.connect(scan_cloud_storage)
         import_profile_dialog.importButton.clicked.connect(import_selected_profile)
         import_profile_dialog.closeButton.clicked.connect(import_profile_dialog.close)
+
+        import_profile_dialog.listWidget.currentItemChanged.connect(lambda: import_profile_dialog.importButton.setEnabled(True if import_profile_dialog.listWidget.currentItem() else False))
 
         config_dialog_pos = dialog.pos()
         config_dialog_size = dialog.size()

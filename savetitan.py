@@ -616,13 +616,14 @@ def show_config_dialog(config):
             message_box = QMessageBox()
             message_box.setIcon(QMessageBox.Information)
             message_box.setWindowTitle("Scan Completed")
-            message = f"Scan completed.\n\n" \
-                      f"Profiles scanned: {scanned_count}\n"
+            message = f"Scan completed.<br><br>" \
+                      f"Profiles scanned: {scanned_count}<br>"
             if added_count > 0:
-                message += f"Profiles already added: {added_count}\n"
+                message += f"Profiles already added: {added_count}<br>"
             if invalid_count > 0:
-                message += f"Invalid profiles (Moved to ../invalid_profiles): {invalid_count}\n"
+                message += f"<font color='red'><b>Invalid profiles (Moved to ../invalid_profiles): {invalid_count}</font></b><br><br>"
             message += f"\nProfiles available for import: {can_import_count}"
+            message_box.setTextFormat(Qt.RichText)
             message_box.setText(message)
             center_dialog_over_dialog(import_profile_dialog, message_box)
             message_box.exec_()

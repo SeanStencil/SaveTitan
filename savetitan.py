@@ -15,7 +15,7 @@ import logging
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex
+from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel
 
 # Get the script's directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -266,6 +266,23 @@ def show_config_dialog(config):
     dialog = uic.loadUi("config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
     dialog.setFixedSize(dialog.size())
+    
+    def load_data_into_model_data():
+        profiles_config = configparser.ConfigParser()
+        profiles_config.read(profiles_config_file)
+
+        data = []
+        for section in profiles_config.sections():
+            profile = profiles_config[section]
+            name = profile.get("name")
+            saves = profile.get("saves")
+            sync_mode = profile.get("sync_mode")
+
+            row = [name, saves, sync_mode, section]
+            
+            data.append(row)
+
+        return data
 
     class TableModel(QtCore.QAbstractTableModel):
         def __init__(self, data, headers):
@@ -301,19 +318,17 @@ def show_config_dialog(config):
 
     headers = ["Profile Name", "Saves", "Mode", "ID"]
 
-    data = []
-    for section in config.sections():
-        if section != "Global Settings":
-            try:
-                profile_name = config.get(section, "name")
-                saves = config.get(section, "saves")
-                sync_mode = config.get(section, "sync_mode")
-                profile_id = section
-                data.append([profile_name, saves, sync_mode, profile_id])
-            except configparser.NoOptionError:
-                continue
-
-    configprofileView.setModel(TableModel(data, headers))
+    data = load_data_into_model_data()
+                
+    proxy_model = QSortFilterProxyModel()
+    proxy_model.setSourceModel(TableModel(data, headers))
+    proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
+    proxy_model.setFilterKeyColumn(0)
+        
+    configprofileView.setModel(proxy_model)
+        
+    filter_field = dialog.findChild(QtWidgets.QLineEdit, "filterField")
+    filter_field.textChanged.connect(lambda text: proxy_model.setFilterFixedString(text))
 
     header = configprofileView.horizontalHeader()
 
@@ -326,7 +341,7 @@ def show_config_dialog(config):
 
     if configprofileView.model().rowCount(QModelIndex()) > 0:
         selected_index = configprofileView.currentIndex()
-        selected_row_data = configprofileView.model()._data[selected_index.row()]
+        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         selected_profile_id = selected_row_data[3]
 
     cloud_storage_path = read_global_config()
@@ -352,46 +367,6 @@ def show_config_dialog(config):
             dialog.actionNewProfile.setEnabled(False)
             dialog.actionRemoveProfile.setEnabled(False)
             dialog.actionImportProfile.setEnabled(False)
-
-    # Load profiles from config into table model
-    def load_data_into_table_model():
-        config = configparser.ConfigParser()
-        config.read(profiles_config_file)
-
-        data = []
-
-        for section in config.sections():
-            if section != "Global Settings":
-                name = config.get(section, "name")
-                saves = config.get(section, "saves")
-                sync_mode = config.get(section, "sync_mode")
-                profile_id = section
-
-                data.append([name, saves, sync_mode, profile_id])
-
-        model = TableModel(data, headers)
-
-        # Setting the model to the view
-        configprofileView.setModel(model)
-
-        return model
-    
-    def load_data_into_model_data():
-        profiles_config = configparser.ConfigParser()
-        profiles_config.read(profiles_config_file)
-
-        data = []
-        for section in profiles_config.sections():
-            profile = profiles_config[section]
-            name = profile.get("name")
-            saves = profile.get("saves")
-            sync_mode = profile.get("sync_mode")
-
-            row = [name, saves, sync_mode, section]
-            
-            data.append(row)
-
-        return data
 
     # Open global settings dialog
     def global_settings_dialog():
@@ -477,9 +452,11 @@ def show_config_dialog(config):
                 save_config_file(config)
 
                 new_row_data = [profile_name, str(saves), sync_mode, profile_id]
-                configprofileView.model()._data.append(new_row_data)
+                configprofileView.model().sourceModel()._data.append(new_row_data)
 
-                configprofileView.model().layoutChanged.emit()
+                configprofileView.model().sourceModel().layoutChanged.emit()
+
+                configprofileView.reset()
 
                 profile_folder = os.path.join(cloud_storage_path, profile_id)
                 os.makedirs(profile_folder, exist_ok=True)
@@ -489,20 +466,20 @@ def show_config_dialog(config):
     def remove_profile():
         selected_index = configprofileView.selectionModel().currentIndex()
         if selected_index.isValid():
-            selected_profile = configprofileView.model()._data[selected_index.row()][0]
+            selected_profile = configprofileView.model().sourceModel()._data[selected_index.row()][0]
             confirm = QMessageBox.question(None, "Remove Profile", f"Are you sure you want to remove the profile '{selected_profile}'?", QMessageBox.Yes | QMessageBox.No)
             if confirm == QMessageBox.Yes:
                 config = configparser.ConfigParser()
                 config.read(profiles_config_file)
 
-                profile_id_to_remove = configprofileView.model()._data[selected_index.row()][3]
+                profile_id_to_remove = configprofileView.model().sourceModel()._data[selected_index.row()][3]
 
                 if profile_id_to_remove in config.sections():
                     config.remove_section(profile_id_to_remove)
                     with open(profiles_config_file, 'w') as configfile:
                         config.write(configfile)
 
-                    configprofileView.model()._data.pop(selected_index.row())
+                    configprofileView.model().sourceModel()._data.pop(selected_index.row())
                     configprofileView.model().layoutChanged.emit()
                 else:
                     QMessageBox.warning(None, "Profile Not Found", f"The profile '{selected_profile}' was not found in the configuration file.")
@@ -557,10 +534,11 @@ def show_config_dialog(config):
 
             invalid_profiles_dir_exists = os.path.exists(invalid_profiles_dir)
             total_subfolders = len(subfolders) - 1 if invalid_profiles_dir_exists else len(subfolders)
-            import_profile_dialog.progressBar.setMaximum(total_subfolders)
+            import_profile_dialog.progressBar.setMaximum(total_subfolders - 1)
 
             for subfolder in subfolders:
                 profile_info_file_path = os.path.join(subfolder, "profile_info.savetitan")
+                import_profile_dialog.progressBar.setValue(import_profile_dialog.progressBar.value() + 1)
                 if not os.path.exists(profile_info_file_path):
                     move_to_invalid(invalid_profiles_dir, subfolder)
                     invalid_count += 1
@@ -611,8 +589,6 @@ def show_config_dialog(config):
                 can_import_count += 1
                 scanned_count += 1
 
-                import_profile_dialog.progressBar.setValue(import_profile_dialog.progressBar.value() + 1)
-
             message_box = QMessageBox()
             message_box.setIcon(QMessageBox.Information)
             message_box.setWindowTitle("Scan Completed")
@@ -658,8 +634,8 @@ def show_config_dialog(config):
                     file_filter = "Executable Files (*.sh *.AppImage)"
 
                 executable_path, _ = QFileDialog.getOpenFileName(import_profile_dialog,
-                                                                 "Import Profile - Locate the executable for " + executable_name,
-                                                                 filter=file_filter)
+                                                                "Import Profile - Locate the executable for " + executable_name,
+                                                                filter=file_filter)
                 if not executable_path:
                     return
 
@@ -676,8 +652,8 @@ def show_config_dialog(config):
                     response = message_box.exec_()
                     if response == 0:
                         executable_path, _ = QFileDialog.getOpenFileName(import_profile_dialog,
-                                                                         "Import Profile - Locate the executable for " + executable_name,
-                                                                         filter=file_filter)
+                                                                        "Import Profile - Locate the executable for " + executable_name,
+                                                                        filter=file_filter)
                         if not executable_path:
                             return
                         selected_executable_name = os.path.basename(executable_path)
@@ -687,11 +663,20 @@ def show_config_dialog(config):
                                                 "Profile import cancelled.")
                             return
 
+                local_save_folder = QFileDialog.getExistingDirectory(import_profile_dialog,
+                                                                    "Import Profile - Locate the save folder for " + profile_name,
+                                                                    options=QFileDialog.ShowDirsOnly)
+                if not local_save_folder:
+                    return
+
                 profiles_config = configparser.ConfigParser()
                 profiles_config.read(profiles_config_file)
 
-                profiles_config[profile_id] = {
+                section_name = profile_id
+                profiles_config[section_name] = {
                     "name": profile_name,
+                    "local_save_folder": local_save_folder,
+                    "game_executable": executable_path,
                     "save_slot": save_slot,
                     "saves": saves,
                     "sync_mode": sync_mode,
@@ -702,32 +687,13 @@ def show_config_dialog(config):
                 with open(profiles_config_file, 'w') as configfile:
                     profiles_config.write(configfile)
 
-                local_save_folder = QFileDialog.getExistingDirectory(import_profile_dialog,
-                                                                     "Import Profile - Locate the save folder for " + profile_name,
-                                                                     options=QFileDialog.ShowDirsOnly)
-                if not local_save_folder:
-                    return
-
-                config = configparser.ConfigParser()
-                config.read(profiles_config_file)
-
-                section_name = profile_id
-                config[section_name] = {
-                    "name": profile_name,
-                    "local_save_folder": local_save_folder,
-                    "game_executable": executable_path,
-                    "save_slot": save_slot,
-                    "saves": saves,
-                    "sync_mode": sync_mode,
-                }
-
-                with open(profiles_config_file, "w") as file:
-                    config.write(file)
-
                 QMessageBox.information(None, "Success", "Profile imported successfully.")
                 new_row_data = [profile_name, saves, sync_mode, profile_id]
-                configprofileView.model()._data.append(new_row_data)
-                configprofileView.model().layoutChanged.emit()
+                configprofileView.model().sourceModel()._data.append(new_row_data)
+                
+                configprofileView.model().sourceModel().layoutChanged.emit()
+
+                configprofileView.reset()
 
                 import_profile_dialog.close()
 
@@ -752,7 +718,7 @@ def show_config_dialog(config):
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to edit.")
             return
 
-        selected_row_data = configprofileView.model()._data[selected_index.row()]
+        selected_row_data = configprofileView.model().sourceModel().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[3]
 
         try:
@@ -779,7 +745,7 @@ def show_config_dialog(config):
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to edit.")
             return
 
-        selected_row_data = configprofileView.model()._data[selected_index.row()]
+        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[3]
 
         try:
@@ -796,7 +762,7 @@ def show_config_dialog(config):
     def update_saveslot_combo():
         selected_index = configprofileView.currentIndex()
         if selected_index.isValid():
-            profile_id = configprofileView.model()._data[selected_index.row()][4]
+            profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][4]
             profiles_config = configparser.ConfigParser()
             profiles_config.read(profiles_config_file)
             
@@ -817,7 +783,7 @@ def show_config_dialog(config):
 
     def update_fields(index):
         if index.isValid():
-            row_data = configprofileView.model()._data[index.row()]
+            row_data = configprofileView.model().sourceModel()._data[index.row()]
             profile_id = row_data[3]
 
             try:
@@ -849,7 +815,7 @@ def show_config_dialog(config):
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to save the fields.")
             return
 
-        selected_row_data = configprofileView.model()._data[selected_index.row()]
+        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[3]
 
         config = configparser.ConfigParser()
@@ -885,7 +851,7 @@ def show_config_dialog(config):
         with open(profile_info_file_path, "w") as file:
             profile_info_config.write(file)
 
-        configprofileView.model()._data = load_data_into_model_data()
+        configprofileView.model().sourceModel()._data = load_data_into_model_data()
         
         for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):
             if configprofileView.model()._data[i][3] == profile_id:

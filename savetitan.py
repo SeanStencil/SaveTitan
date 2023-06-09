@@ -97,28 +97,30 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
 
 # Perform backup function prior to sync
 def make_backup_copy(original_folder):
-    def copy_and_verify():
-        backup_folder = original_folder + ".bak"
+    backup_folder = original_folder + ".bak"
 
-        if os.path.exists(backup_folder):
-            shutil.rmtree(backup_folder)
+    while True:
+        try:
+            if os.path.exists(backup_folder):
+                shutil.rmtree(backup_folder)
 
-        shutil.copytree(original_folder, backup_folder)
+            shutil.copytree(original_folder, backup_folder)
 
-        comparison = dircmp(original_folder, backup_folder)
-        return comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny
+            comparison = filecmp.dircmp(original_folder, backup_folder)
 
-    copied = copy_and_verify()
-
-    while not copied:
-        reply = QMessageBox.warning(None, "Backup Error",
-                                    "There was an error making a backup copy. "
-                                    "Please verify the source and destination folders, and try again.",
-                                    QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
-        if reply == QMessageBox.Retry:
-            copied = copy_and_verify()
-        else:
-            break
+            if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
+                match, mismatch, errors = filecmp.cmpfiles(original_folder, backup_folder, comparison.common_files)
+                if len(mismatch) == 0 and len(errors) == 0:
+                    break
+            else:
+                raise Exception("Mismatch in directory contents")
+        except Exception as e:
+            reply = QMessageBox.warning(None, "Backup Error",
+                                        "There was an error making a backup copy. "
+                                        "Please verify the source and destination folders, and try again.",
+                                        QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+            if reply != QMessageBox.Retry:
+                break
 
 
 # Function to check and sync saves
@@ -171,7 +173,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 def sync_save_cloud(game_profile, save_slot): 
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
     
-    def sync_and_verify():
+    while True:
         try:
             if not os.path.exists(save_folder):
                 os.makedirs(save_folder)
@@ -180,57 +182,46 @@ def sync_save_cloud(game_profile, save_slot):
 
             shutil.rmtree(save_folder)
             shutil.copytree(local_save_folder, save_folder)
-            comparison = dircmp(local_save_folder, save_folder)
-            return comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny
+            
+            comparison = filecmp.dircmp(local_save_folder, save_folder)
 
+            if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
+                match, mismatch, errors = filecmp.cmpfiles(local_save_folder, save_folder, comparison.common_files)
+                if len(mismatch) == 0 and len(errors) == 0:
+                    break
+            else:
+                raise Exception("Mismatch in directory contents")
         except Exception as e:
-            QMessageBox.critical(None, "Sync Error", 
-                                 f"An error occurred during the sync process: {str(e)}")
-            return False
-
-    synced = sync_and_verify()
-
-    while not synced:
-        reply = QMessageBox.warning(None, "Sync Error",
-                                    "There was an error syncing saves to cloud storage. "
-                                    "Please verify the source and destination folders, and try again.",
-                                    QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
-        if reply == QMessageBox.Retry:
-            synced = sync_and_verify()
-        else:
-            break
-
+            reply = QMessageBox.critical(None, "Sync Error",
+                                         f"An error occurred during the sync process: {str(e)}",
+                                         QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+            if reply != QMessageBox.Retry:
+                break
 
 
 # Function to sync saves (copy Cloud saves to local storage)
 def sync_save_local(game_profile):
-    def sync_and_verify():
+    while True:
         try:
             make_backup_copy(local_save_folder)
 
             shutil.rmtree(local_save_folder)
             shutil.copytree(game_profile_folder, local_save_folder)
 
-            comparison = dircmp(game_profile_folder, local_save_folder)
-            return comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny
+            comparison = filecmp.dircmp(game_profile_folder, local_save_folder)
 
+            if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
+                match, mismatch, errors = filecmp.cmpfiles(game_profile_folder, local_save_folder, comparison.common_files)
+                if len(mismatch) == 0 and len(errors) == 0:
+                    break
+            else:
+                raise Exception("Mismatch in directory contents")
         except Exception as e:
-            QMessageBox.critical(None, "Sync Error", 
-                                 f"An error occurred during the sync process: {str(e)}")
-            return False
-
-    synced = sync_and_verify()
-
-    while not synced:
-        reply = QMessageBox.warning(None, "Sync Error",
-                                    "There was an error syncing saves from cloud storage. "
-                                    "Please verify the source and destination folders, and try again.",
-                                    QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
-        if reply == QMessageBox.Retry:
-            synced = sync_and_verify()
-        else:
-            break
-
+            reply = QMessageBox.critical(None, "Sync Error",
+                                         f"An error occurred during the sync process: {str(e)}",
+                                         QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+            if reply != QMessageBox.Retry:
+                break
 
 
 # Function to launch the game

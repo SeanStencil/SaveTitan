@@ -265,6 +265,7 @@ def set_cloud_storage_path():
     dialog.importButton.setEnabled(True)
 
 
+# Calculate the center position over another dialog window
 def center_dialog_over_dialog(first_dialog, second_dialog):
     def move_second_dialog_to_center():
         first_dialog_size = first_dialog.size()
@@ -558,6 +559,7 @@ def show_config_dialog(config):
                 file.write(f"{subfolder}, {reason}\n")
 
 
+        # Scan the cloud storage location for importable profiles
         def scan_cloud_storage():
             scanned_count = 0
             added_count = 0
@@ -652,12 +654,7 @@ def show_config_dialog(config):
             message_box.exec_()
 
 
-        def move_to_invalid(invalid_profiles_dir, subfolder):
-            new_path = os.path.join(invalid_profiles_dir, os.path.basename(subfolder))
-            shutil.move(subfolder, new_path)
-            logging.info(f"Invalid: {subfolder}")
-
-
+        # Function to import selected profile to profiles.ini
         def import_selected_profile():
             selected_item = import_profile_dialog.listWidget.currentItem()
             if selected_item:
@@ -780,6 +777,7 @@ def show_config_dialog(config):
         about.exec_()
 
 
+    # Update the executable location for selected profile
     def update_executable():
         cloud_storage_path = read_global_config()
 
@@ -832,6 +830,7 @@ def show_config_dialog(config):
         dialog.executableField.setText(filepath)
 
 
+    # Update save game location for selected profile
     def update_local_save_folder():
         cloud_storage_path = read_global_config()
 
@@ -868,6 +867,7 @@ def show_config_dialog(config):
         dialog.saveField.setText(save_folder)
 
 
+    # Update save slot for selected profile
     def update_saveslot_combo():
         selected_index = configprofileView.currentIndex()
         if selected_index.isValid():
@@ -891,6 +891,7 @@ def show_config_dialog(config):
         dialog.saveslotCombo.setCurrentIndex(int(save_slot) - 1)
 
 
+    # Function to update fields in the edit profile section with selected profile
     def update_fields(index):
         if index.isValid():
             row_data = configprofileView.model().sourceModel()._data[index.row()]
@@ -920,6 +921,7 @@ def show_config_dialog(config):
                 return
 
 
+    # Function to save field information to selected profile
     def save_profile_fields():
         selected_index = configprofileView.currentIndex()
         if not selected_index.isValid():

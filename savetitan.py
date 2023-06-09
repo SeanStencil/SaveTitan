@@ -314,8 +314,6 @@ def show_config_dialog(config):
 
     configprofileView = dialog.findChild(QtWidgets.QTableView, "configprofileView")
 
-    configprofileView.verticalHeader().setVisible(False)
-
     headers = ["Profile Name", "Saves", "Mode", "ID"]
 
     data = load_data_into_model_data()
@@ -718,7 +716,7 @@ def show_config_dialog(config):
             QMessageBox.warning(None, "No Profile Selected", "Please select a profile to edit.")
             return
 
-        selected_row_data = configprofileView.model().sourceModel().sourceModel()._data[selected_index.row()]
+        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[3]
 
         try:

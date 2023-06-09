@@ -1050,6 +1050,9 @@ def show_config_dialog(config):
 
         QMessageBox.information(None, "Profile Saved", "The profile has been successfully saved.")
 
+    # Temporary disables
+    dialog.saveslotCombo.setEnabled(False)
+
     # Connections for button clicks
     dialog.executablefieldButton.clicked.connect(update_executable)
     dialog.savefieldButton.clicked.connect(update_local_save_folder)

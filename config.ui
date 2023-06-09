@@ -20,7 +20,7 @@
    <enum>Qt::ActionsContextMenu</enum>
   </property>
   <property name="windowTitle">
-   <string>SaveTitan - Configuration (ALPHA)</string>
+   <string>SaveTitan - Configuration (UNSTABLE BUILD)</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QGroupBox" name="groupBox">

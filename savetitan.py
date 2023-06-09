@@ -189,7 +189,6 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 
 # Function to sync saves (copy local saves to cloud storage)
 def sync_save_cloud(game_profile, save_slot): 
-    print("LOCAL TO CLOUD SYNC CALLED")
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
     if not network_share_accessible(save_folder):
         return
@@ -219,7 +218,6 @@ def sync_save_cloud(game_profile, save_slot):
 
 
 def sync_save_local(source_folder, destination_folder):
-    print("CLOUD TO LOCAL SYNC CALLED")
     if not network_share_accessible(destination_folder):
         return
     while True:

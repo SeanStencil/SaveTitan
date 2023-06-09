@@ -848,7 +848,7 @@ def show_config_dialog(config):
         about = QMessageBox()
         about.setWindowIcon(QIcon('icon/path'))
         about.setWindowTitle("About SaveTitan")
-        about.setText("SaveTitan\n\nSaveTitan is a game save management tool that allows you to sync your game saves between local storage and cloud storage.\n\nDeveloped by Sean Bowman")
+        about.setText("SaveTitan v0.10\n\nSaveTitan is a game save management tool that allows you to sync your game saves between local storage and cloud storage.\n\nBy Sean Bowman")
         about.exec_()
 
 

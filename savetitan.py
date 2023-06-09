@@ -525,13 +525,6 @@ def show_config_dialog(config):
             can_import_count = 0
             import_profile_dialog.progressBar.setValue(0)
 
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-
-            with open('import_scan.log', 'a') as file:
-                file.truncate(0)
-            logging.basicConfig(filename='import_scan.log', filemode='w', level=logging.INFO,
-                                format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
             import_profile_dialog.listWidget.clear()
 
             cloud_storage_path = read_global_config()

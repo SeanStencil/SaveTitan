@@ -621,7 +621,8 @@ def show_config_dialog(config):
             if added_count > 0:
                 message += f"Profiles already added: {added_count}<br>"
             if invalid_count > 0:
-                message += f"<font color='red'><b>Invalid profiles (Moved to ../invalid_profiles): {invalid_count}</font></b><br><br>"
+                message += f"<br><font color='red'><b>Invalid profiles: {invalid_count}</b></font><br>"
+                message += f"<font color='red'>(Moved to &lt;Cloud Storage Path&gt;/invalid_profiles)</font><br><br>"
             message += f"\nProfiles available for import: {can_import_count}"
             message_box.setTextFormat(Qt.RichText)
             message_box.setText(message)

@@ -13,6 +13,7 @@ import glob
 import stat
 import logging
 
+
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog
 from PyQt5.QtGui import QIcon
@@ -178,7 +179,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                                              f"The cloud save (last modified: {cloud_save_time_str}) is newer than the one in local save (last modified: {local_save_time_str}). Do you want to download your cloud save?",
                                              QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
                 if reply == QMessageBox.Yes:
-                    sync_save_local(args.runprofile)
+                    sync_save_local(game_profile_folder_save_slot, local_save_folder)
                     launch_game(game_executable, save_slot)
                 else:
                     launch_game(game_executable, save_slot)

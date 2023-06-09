@@ -247,6 +247,19 @@ def set_cloud_storage_path():
     dialog.addButton.setEnabled(True)
     dialog.importButton.setEnabled(True)
 
+def center_dialog_over_dialog(first_dialog, second_dialog):
+    def move_second_dialog_to_center():
+        first_dialog_size = first_dialog.size()
+        first_dialog_loc = first_dialog.pos()
+
+        second_dialog_size = second_dialog.frameGeometry()
+        x = int(first_dialog_loc.x() + (first_dialog_size.width() - second_dialog_size.width()) / 2)
+        y = int(first_dialog_loc.y() + (first_dialog_size.height() - second_dialog_size.height()) / 2)
+
+        second_dialog.move(x, y)
+
+    QTimer.singleShot(0, move_second_dialog_to_center)
+
 # Function to show config dialog
 def show_config_dialog(config):
     global dialog
@@ -394,15 +407,7 @@ def show_config_dialog(config):
         layout.addWidget(cloud_storage_button)
         global_settings_dialog.setLayout(layout)
 
-        config_settings_dialog_pos = dialog.pos()
-        config_settings_dialog_size = dialog.size()
-
-        global_settings_dialog_width = global_settings_dialog.frameGeometry().width()
-        global_settings_dialog_height = global_settings_dialog.frameGeometry().height()
-        x = int(config_settings_dialog_pos.x() + (config_settings_dialog_size.width() - global_settings_dialog_width) / 2)
-        y = int(config_settings_dialog_pos.y() + (config_settings_dialog_size.height() - global_settings_dialog_height) / 2)
-
-        global_settings_dialog.move(x, y)
+        center_dialog_over_dialog(dialog, global_settings_dialog)
 
         global_settings_dialog.exec_()
 
@@ -522,15 +527,8 @@ def show_config_dialog(config):
         import_profile_dialog.setFixedSize(import_profile_dialog.size())
         import_profile_dialog.importButton.setEnabled(False)
 
-        config_dialog_pos = dialog.pos()
-        config_dialog_size = dialog.size()
+        center_dialog_over_dialog(dialog, import_profile_dialog)
 
-        import_dialog_width = import_profile_dialog.frameGeometry().width()
-        import_dialog_height = import_profile_dialog.frameGeometry().height()
-        x = int(config_dialog_pos.x() + (config_dialog_size.width() - import_dialog_width) / 2)
-        y = int(config_dialog_pos.y() + (config_dialog_size.height() - import_dialog_height) / 2)
-
-        import_profile_dialog.move(x, y)
         import_profile_dialog.listWidget.setEnabled(False)
 
         def scan_cloud_storage():
@@ -557,7 +555,9 @@ def show_config_dialog(config):
             invalid_profiles_dir = os.path.join(cloud_storage_path, "invalid_profiles")
             os.makedirs(invalid_profiles_dir, exist_ok=True)
 
-            import_profile_dialog.progressBar.setMaximum(len(subfolders))
+            invalid_profiles_dir_exists = os.path.exists(invalid_profiles_dir)
+            total_subfolders = len(subfolders) - 1 if invalid_profiles_dir_exists else len(subfolders)
+            import_profile_dialog.progressBar.setMaximum(total_subfolders)
 
             for subfolder in subfolders:
                 profile_info_file_path = os.path.join(subfolder, "profile_info.savetitan")
@@ -613,8 +613,6 @@ def show_config_dialog(config):
 
                 import_profile_dialog.progressBar.setValue(import_profile_dialog.progressBar.value() + 1)
 
-            import_profile_dialog.progressBar.setValue(0)
-
             message_box = QMessageBox()
             message_box.setIcon(QMessageBox.Information)
             message_box.setWindowTitle("Scan Completed")
@@ -624,6 +622,9 @@ def show_config_dialog(config):
                                 f"Invalid profiles moved to invalid_profiles: {invalid_count}\n"
                                 f"\n"
                                 f"Profiles available for import: {can_import_count}")
+
+            center_dialog_over_dialog(import_profile_dialog, message_box)
+
             message_box.exec_()
 
         def move_to_invalid(invalid_profiles_dir, subfolder):

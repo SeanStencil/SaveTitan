@@ -1162,10 +1162,14 @@ app = QApplication([])
 
 config = configparser.ConfigParser()
 config.read(profiles_config_file)
+cloud_storage_path = read_global_config()  # read the cloud_storage_path before the conditions
+
+if not cloud_storage_path:
+    print("Cloud storage path is not configured. Run the script without a parameter to run the first-time setup")
+    sys.exit(1)
 
 if args.runprofile:
-    cloud_storage_path = read_global_config()
-
+    # The keys in the config are now profile_id, not names. So, we need to check the 'name' field.
     existing_profiles = [section for section in config.sections() if config[section]['name'].lower() == args.runprofile.lower()]
     if not existing_profiles:
         print("The specified game profile does not exist in profiles.ini")
@@ -1173,31 +1177,18 @@ if args.runprofile:
     else:
         profile_id = existing_profiles[0]
         name, local_save_folder, game_executable, save_slot, saves, sync_mode = read_config_file(profile_id)
-
         game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
-
-        if not cloud_storage_path:
-            print("Run the script without a parameter to run the first-time setup. Cloud storage location is not defined")
-            sys.exit(1)
-        else:
-            check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
+        check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
 elif args.runid:
-    cloud_storage_path = read_global_config()
-
+    # Check if the profile_id exists in the config
     if not config.has_section(args.runid):
         print("The specified profile ID does not exist in profiles.ini")
         sys.exit(1)
     else:
         profile_id = args.runid
         name, local_save_folder, game_executable, save_slot, saves, sync_mode = read_config_file(profile_id)
-
         game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
-
-        if not cloud_storage_path:
-            print("Run the script without a parameter to run the first-time setup. Cloud storage location is not defined")
-            sys.exit(1)
-        else:
-            check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
+        check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
 else:
     show_config_dialog(config)
 

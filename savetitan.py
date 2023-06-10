@@ -885,11 +885,14 @@ def show_config_dialog(config):
        
        
     # Show the about dialog window
-    def about_dialog():
+    def about_dialog(config_dialog):
         about = QMessageBox()
         about.setWindowIcon(QIcon('icon/path'))
         about.setWindowTitle("About SaveTitan")
         about.setText("SaveTitan v0.10\n\nSaveTitan is a game save management tool that allows you to sync your game saves between local storage and cloud storage.\n\nBy Sean Bowman")
+
+        center_dialog_over_dialog(config_dialog, about)
+
         about.exec_()
 
 
@@ -1145,7 +1148,7 @@ def show_config_dialog(config):
 
     dialog.actionNew_Profile.triggered.connect(add_profile)
     dialog.actionExit.triggered.connect(dialog.close)
-    dialog.actionAbout.triggered.connect(about_dialog)
+    dialog.actionAbout.triggered.connect(lambda: about_dialog(dialog))
 
     dialog.show()
 

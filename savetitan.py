@@ -68,27 +68,38 @@ def check_write_permissions(path, name):
                              f"Permission denied to write to the {name}. Please check the file permissions and try again.")
         return False
 
+
 # Try and wake up the network location
-def network_share_accessible(path):
-    if os.path.exists(path):
+def network_share_accessible():
+    cloud_storage_path = read_global_config()
+
+    if cloud_storage_path is None:
+        QMessageBox.critical(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured. Please configure it.")
+        return False
+
+    cloud_storage_path = cloud_storage_path.replace("\\", "\\\\")
+
+    if os.path.exists(cloud_storage_path):
         return True
     else:
-        parent_dir = os.path.dirname(path)
-        if os.path.exists(parent_dir):
-            return True
-        else:
-            try:
-                os.listdir(parent_dir)
-                return os.path.exists(parent_dir)
-            except Exception as e:
-                QMessageBox.critical(None, "Network Error",
-                                     f"An error occurred while trying to access the network share: {str(e)}")
-                return False
+        try:
+            os.listdir(cloud_storage_path)
+            return os.path.exists(cloud_storage_path)
+        except Exception as e:
+            QMessageBox.critical(None, "Network Error",
+                                 f"An error occurred while trying to access the network share: {str(e)}")
+            return False
 
 
 # Export a .savetitan file for the profile folder in cloud storage
 def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name):
     global cloud_storage_path
+
+
+    if not network_share_accessible():
+        QMessageBox.critical(None, "Add Profile Aborted",
+                             "The network location is not accessible, the process to add the profile has been aborted.")
+        return
 
     folder_path = os.path.join(cloud_storage_path, profile_id)
     os.makedirs(folder_path, exist_ok=True)
@@ -109,8 +120,8 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
         with open(file_path, "w") as file:
             config.write(file)
     except Exception as e:
-        print(f"Error exporting profile info: {str(e)}")
-        raise Exception("File write error")
+        QMessageBox.critical(None, "Add Profile Aborted",
+                             f"Error exporting profile info: {str(e)}. The process to add the profile has been aborted.")
 
 
 # Perform backup function prior to sync
@@ -190,7 +201,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 # Function to sync saves (copy local saves to cloud storage)
 def sync_save_cloud(game_profile, save_slot): 
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
-    if not network_share_accessible(save_folder):
+    if not network_share_accessible():
         return
     while True:
         try:
@@ -218,7 +229,7 @@ def sync_save_cloud(game_profile, save_slot):
 
 
 def sync_save_local(source_folder, destination_folder):
-    if not network_share_accessible(destination_folder):
+    if not network_share_accessible():
         return
     while True:
         try:
@@ -589,7 +600,6 @@ def show_config_dialog(config):
                     configprofileView.reset()
 
                 except Exception as e:
-                    print(f"Error adding profile: {str(e)}")
                     QMessageBox.warning(None, "Profile Creation Error",
                                         "There was an error creating the profile. The operation has been aborted.",
                                         QMessageBox.Ok)

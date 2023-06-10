@@ -905,8 +905,19 @@ def show_config_dialog(config):
         about = QMessageBox()
         about.setWindowIcon(QIcon('icon/path'))
         about.setWindowTitle("About SaveTitan")
-        about.setText("SaveTitan v0.10\n\nSaveTitan is a game save management tool that allows you to sync your game saves between local storage and cloud storage.\n\nBy Sean Bowman")
+        about.setTextFormat(Qt.RichText)
 
+        about_text = """
+        <h1><span style="font-weight:600; font-family:Arial; color:#555;">SaveTitan v0.10</span></h1>
+        <p>
+        SaveTitan is a powerful game save management tool that allows you to sync your game saves between local storage and cloud storage. 
+        It is designed for granularity and control so you get the best experience jumping from device to device.
+        </p>
+        <p>
+        By Sean Bowman
+        </p>
+        """
+        about.setText(about_text)
         center_dialog_over_dialog(config_dialog, about)
 
         about.exec_()

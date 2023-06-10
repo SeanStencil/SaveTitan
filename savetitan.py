@@ -1153,18 +1153,19 @@ def show_config_dialog(config):
 # Parse command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-runprofile", help="Specify the game profile to be used")
+parser.add_argument("-runid", help="Specify the profile ID to be used")
 args = parser.parse_args()
 
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
 app = QApplication([])
 
+config = configparser.ConfigParser()
+config.read(profiles_config_file)
+
 if args.runprofile:
-    config = configparser.ConfigParser()
-    config.read(profiles_config_file)
     cloud_storage_path = read_global_config()
 
-    # The keys in the config are now profile_id, not names. So, we need to check the 'name' field.
     existing_profiles = [section for section in config.sections() if config[section]['name'].lower() == args.runprofile.lower()]
     if not existing_profiles:
         print("The specified game profile does not exist in profiles.ini")
@@ -1180,9 +1181,24 @@ if args.runprofile:
             sys.exit(1)
         else:
             check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
+elif args.runid:
+    cloud_storage_path = read_global_config()
+
+    if not config.has_section(args.runid):
+        print("The specified profile ID does not exist in profiles.ini")
+        sys.exit(1)
+    else:
+        profile_id = args.runid
+        name, local_save_folder, game_executable, save_slot, saves, sync_mode = read_config_file(profile_id)
+
+        game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
+
+        if not cloud_storage_path:
+            print("Cloud storage path is not configured. Please run the script with the 'global' argument to configure it")
+            sys.exit(1)
+        else:
+            check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
 else:
-    config = configparser.ConfigParser()
-    config.read(profiles_config_file)
     show_config_dialog(config)
 
 app.exec_()

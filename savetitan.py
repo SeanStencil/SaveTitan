@@ -657,17 +657,9 @@ def show_config_dialog(config):
         import_profile_dialog.listWidget.setEnabled(False)
 
 
-        def write_to_log(invalid_profiles_path, subfolder, reason):
-            # Check if subfolder already logged
-            with open(invalid_profiles_path, 'r') as file:
-                lines = file.readlines()
-                for line in lines:
-                    if subfolder in line:
-                        return  # If found, don't write again
-
-            # If not found, write to log
-            with open(invalid_profiles_path, 'a') as file:
-                file.write(f"{subfolder}, {reason}\n")
+        def write_to_log(filepath, subfolder, message):
+            with open(filepath, 'a') as f:
+                f.write(f"{subfolder}: {message}\n")
 
 
         # Scan the cloud storage location for importable profiles
@@ -684,13 +676,18 @@ def show_config_dialog(config):
             if not cloud_storage_path:
                 return
 
+            # Check if the network share is accessible
+            if not network_share_accessible():
+                QMessageBox.critical(None, "Network Error", 
+                                     "An error occurred while trying to access the network share. Please check your connection and try again.")
+                return
+
             config = configparser.ConfigParser()
             config.read(profiles_config_file)
 
             subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
             invalid_profiles_path = os.path.join(script_dir, "invalid_profiles.log")
-            if not os.path.isfile(invalid_profiles_path):
-                open(invalid_profiles_path, 'a').close()
+            open(invalid_profiles_path, 'w').close()
 
             total_subfolders = len(subfolders)
             import_profile_dialog.progressBar.setMaximum(total_subfolders - 1)
@@ -791,6 +788,12 @@ def show_config_dialog(config):
 
                 cloud_storage_path = read_global_config()
                 if not cloud_storage_path:
+                    return
+
+                # Check if the network share is accessible
+                if not network_share_accessible():
+                    QMessageBox.critical(None, "Network Error", 
+                                         "An error occurred while trying to access the network share. Please check your connection and try again.")
                     return
 
                 while True:

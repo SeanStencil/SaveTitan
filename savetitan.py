@@ -1083,7 +1083,7 @@ def show_config_dialog(config):
         configprofileView.model().sourceModel()._data = load_data_into_model_data()
         
         for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):
-            if configprofileView.model()._data[i][3] == profile_id:
+            if configprofileView.model().sourceModel()._data[i][3] == profile_id:
                 new_index = configprofileView.model().index(i, 0)
                 configprofileView.setCurrentIndex(new_index)
                 update_fields(new_index)

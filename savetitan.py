@@ -1116,43 +1116,33 @@ def show_config_dialog(config):
 
     # Function to create context menu
     def context_menu(point):
-        # Create a QMenu object
         menu = QMenu()
 
-        # Create actions
         open_cloud_storage_action = QAction("Open Cloud Storage", menu)
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
 
-        # Get the currently selected profile id
-        selected_index = configprofileView.selectionModel().currentIndex()
-        if selected_index.isValid():
-            selected_profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][3]
-            
-            # Connect actions to functions
+        index = configprofileView.indexAt(point)
+        
+        if index.isValid():
+            selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][3]
+
             open_cloud_storage_action.triggered.connect(lambda: open_cloud_location_storage(selected_profile_id))
             open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
             delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
 
-            # Add actions to menu
             menu.addAction(open_local_save_action)
             menu.addAction(open_cloud_storage_action)
-            menu.addSeparator()  # This adds a separating line
+            menu.addSeparator()
             menu.addAction(delete_profile_action)
 
-            # Show the context menu.
             menu.exec_(configprofileView.viewport().mapToGlobal(point))
-        else:
-            QMessageBox.warning(None, "No Profile Selected", "Please select a profile first.")
 
-    # Attach the context menu to the configprofileView
     configprofileView.setContextMenuPolicy(Qt.CustomContextMenu)
     configprofileView.customContextMenuRequested.connect(context_menu)
     
-    # Connections for configprofileView clicks
     configprofileView.selectionModel().currentChanged.connect(update_fields)
 
-    # Connections for menu actions
     dialog.actionNew_Profile.triggered.connect(add_profile)
     dialog.actionExit.triggered.connect(dialog.close)
     dialog.actionAbout.triggered.connect(about_dialog)

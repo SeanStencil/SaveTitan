@@ -784,6 +784,15 @@ def show_config_dialog(config):
                 executable_name = config.get(profile_id, "executable_name")
                 sync_mode = config.get(profile_id, "sync_mode")
 
+                profiles_config = configparser.ConfigParser()
+                profiles_config.read(profiles_config_file)
+
+                for section in profiles_config.sections():
+                    if profiles_config.get(section, 'name').lower() == profile_name.lower():
+                        QMessageBox.critical(None, "Profile Already Exists", 
+                                             "A profile with the same name already exists. Please change the name of the existing profile before importing this one.")
+                        return
+
                 if sys.platform == "win32":
                     file_filter = "Executable Files (*.exe *.bat *.cmd)"
                 elif sys.platform == "darwin":
@@ -797,7 +806,7 @@ def show_config_dialog(config):
 
                 if not network_share_accessible():
                     QMessageBox.critical(None, "Network Error", 
-                                         "An error occurred while trying to access the network share. Please check your connection and try again.")
+                                        "An error occurred while trying to access the network share. Please check your connection and try again.")
                     return
 
                 while True:
@@ -852,6 +861,11 @@ def show_config_dialog(config):
 
                 profiles_config = configparser.ConfigParser()
                 profiles_config.read(profiles_config_file)
+
+                for section in profiles_config.sections():
+                    if profiles_config.get(section, 'name').lower() == profile_name.lower():
+                        QMessageBox.critical(None, "Profile Already Exists", "A profile with the same name already exists. Please change the name of the existing profile before importing this one.")
+                        return
 
                 section_name = profile_id
                 profiles_config[section_name] = {

@@ -740,13 +740,16 @@ def show_config_dialog(config):
                     import_profile_dialog.listWidget.setEnabled(True)
                 profile_name = config_savetitan.get(profile_id, "name")
                 executable_name = config_savetitan.get(profile_id, "executable_name")
-                item_text = f"{profile_id} - {profile_name} ({executable_name})"
+                item_text = f"{profile_name} - {executable_name} ({profile_id})"
                 item = QtWidgets.QListWidgetItem(item_text)
                 item.setData(Qt.UserRole, profile_id)
                 item.setData(Qt.UserRole + 1, profile_info_file_path)
                 import_profile_dialog.listWidget.addItem(item)
                 can_import_count += 1
                 scanned_count += 1
+
+            if invalid_count == 0 and os.path.exists(invalid_profiles_path):
+                os.remove(invalid_profiles_path)
 
             message_box = QMessageBox()
             message_box.setIcon(QMessageBox.Information)

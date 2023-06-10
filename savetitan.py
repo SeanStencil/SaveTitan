@@ -1079,6 +1079,12 @@ def show_config_dialog(config):
         save_slot = int(dialog.saveslotCombo.currentText().split()[1])
         sync_mode = config.get(profile_id, "sync_mode", fallback="Sync")
 
+        for section in config.sections():
+            if section != profile_id and config.get(section, 'name').lower() == profile_name.lower():
+                QMessageBox.critical(None, "Profile Already Exists", 
+                                     "A profile with the same name already exists. Please choose a different name.")
+                return
+
         config.set(profile_id, "name", profile_name)
         config.set(profile_id, "local_save_folder", local_save_folder)
         config.set(profile_id, "game_executable", game_executable)
@@ -1109,6 +1115,7 @@ def show_config_dialog(config):
                 break
 
         QMessageBox.information(None, "Profile Saved", "The profile has been successfully saved.")
+
 
     # Temporary disables
     dialog.saveslotCombo.setEnabled(False)

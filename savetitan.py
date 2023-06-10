@@ -15,7 +15,7 @@ import logging
 
 
 from PyQt5 import QtWidgets, uic, QtCore
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog
 from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
@@ -523,86 +523,85 @@ def show_config_dialog(config):
 
         config_dialog = QApplication.activeWindow()
 
-        profile_dialog = QInputDialog(config_dialog)
-        profile_dialog.setWindowTitle("Add Profile")
-        profile_dialog.setLabelText("Enter the profile name:")
-        profile_dialog.setWindowModality(Qt.WindowModal)
+        add_profile_dialog = uic.loadUi("add_profile.ui")
 
-        if profile_dialog.exec_() == QInputDialog.Accepted:
-            profile_name = profile_dialog.textValue().strip()
-            if profile_name:
-                existing_profiles = [section for section in config.sections() if config.get(section, 'name').lower() == profile_name.lower()]
-                if existing_profiles:
-                    QMessageBox.critical(None, "Profile Already Exists", "A profile with the same name already exists. Please choose a different name.")
-                    return
+        def select_executable():
+            file_filter = "Executable Files (*.exe *.bat *.cmd)" if sys.platform == "win32" else "Executable Files (*.sh *.AppImage)"
+            game_executable, ok = QFileDialog.getOpenFileName(None, "Select Executable", filter=file_filter)
+            if ok:
+                add_profile_dialog.executableField.setText(game_executable)
 
-                if sys.platform == "win32":
-                    file_filter = "Executable Files (*.exe *.bat *.cmd)"
-                elif sys.platform == "darwin":
-                    file_filter = "Executable Files (*.app *.command)"
-                else:
-                    file_filter = "Executable Files (*.sh *.AppImage)"
+        add_profile_dialog.executablefieldButton.clicked.connect(select_executable)
 
-                while True:
-                    game_executable, ok = QFileDialog.getOpenFileName(config_dialog, "Add Profile - Locate the executable for " + profile_name, filter=file_filter)
-                    if not ok:
-                        return
-                    elif game_executable.startswith(cloud_storage_path):
-                        QMessageBox.warning(None, "Executable Location Error",
-                                            "The selected executable is inside the cloud storage path. "
-                                            "Please select an executable outside the cloud storage path.")
-                    else:
-                        break
+        def select_save_directory():
+            save_directory = QFileDialog.getExistingDirectory(None, "Select Save Directory")
+            if save_directory:
+                add_profile_dialog.saveField.setText(save_directory)
 
-                executable_name = os.path.basename(game_executable)
+        add_profile_dialog.savefieldButton.clicked.connect(select_save_directory)
 
-                while True:
-                    local_save_folder = QFileDialog.getExistingDirectory(config_dialog, "Add Profile - Locate the save folder for " + profile_name, options=QFileDialog.ShowDirsOnly)
-                    if not local_save_folder:
-                        return
-                    elif local_save_folder.startswith(cloud_storage_path):
-                        QMessageBox.warning(None, "Save Location Error",
-                                            "The selected save folder is inside the cloud storage path. "
-                                            "Please select a save folder outside the cloud storage path.")
-                    else:
-                        break
+        center_dialog_over_dialog(config_dialog, add_profile_dialog)
 
-                profile_id = None
-                while True:
-                    profile_id = generate_id()
-                    if not any(profile_id == section for section in config.sections()):
-                        break
+        while True:
+            result = add_profile_dialog.exec()
+            if result == QDialog.Rejected:
+                break
 
-                save_slot = 1
-                saves = 1
-                sync_mode = "Sync"
+            profile_name = add_profile_dialog.profilefieldName.text()
+            game_executable = add_profile_dialog.executableField.text()
+            local_save_folder = add_profile_dialog.saveField.text()
 
-                profile_folder = os.path.join(cloud_storage_path, profile_id)
-                os.makedirs(profile_folder, exist_ok=True)
-                try:
-                    export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name)
+            if not all([profile_name, game_executable, local_save_folder]):
+                QMessageBox.warning(None, "Missing Data", "All fields must be filled.")
+                continue
 
-                    config[profile_id] = {
-                        "name": profile_name,
-                        "local_save_folder": local_save_folder,
-                        "game_executable": game_executable,
-                        "save_slot": str(save_slot),
-                        "saves": str(saves),
-                        "sync_mode": sync_mode,
-                    }
-                    save_config_file(config)
+            if not os.path.exists(game_executable):
+                QMessageBox.warning(None, "Invalid Executable", "The executable path is not valid.")
+                continue
+            if not os.path.isdir(local_save_folder):
+                QMessageBox.warning(None, "Invalid Save Directory", "The save directory path is not valid.")
+                continue
 
-                    new_row_data = [profile_name, str(saves), sync_mode, profile_id]
-                    configprofileView.model().sourceModel()._data.append(new_row_data)
+            existing_profiles = [section for section in config.sections() if config.get(section, 'name').lower() == profile_name.lower()]
+            if existing_profiles:
+                QMessageBox.critical(None, "Profile Already Exists", "A profile with the same name already exists. Please choose a different name.")
+                continue
 
-                    configprofileView.model().sourceModel().layoutChanged.emit()
+            sync_mode = "Sync" if add_profile_dialog.syncRadio.isChecked() else "Backup"
 
-                    configprofileView.reset()
+            profile_id = None
+            while True:
+                profile_id = generate_id()
+                if not any(profile_id == section for section in config.sections()):
+                    break
 
-                except Exception as e:
-                    QMessageBox.warning(None, "Profile Creation Error",
-                                        "There was an error creating the profile. The operation has been aborted.",
-                                        QMessageBox.Ok)
+            save_slot = 1
+            saves = 1
+
+            profile_folder = os.path.join(cloud_storage_path, profile_id)
+            os.makedirs(profile_folder, exist_ok=True)
+
+            try:
+                export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, os.path.basename(game_executable))
+
+                config[profile_id] = {
+                    "name": profile_name,
+                    "local_save_folder": local_save_folder,
+                    "game_executable": game_executable,
+                    "save_slot": str(save_slot),
+                    "saves": str(saves),
+                    "sync_mode": sync_mode,
+                }
+                save_config_file(config)
+
+                new_row_data = [profile_name, str(saves), sync_mode, profile_id]
+                configprofileView.model().sourceModel()._data.append(new_row_data)
+                configprofileView.model().sourceModel().layoutChanged.emit()
+                configprofileView.reset()
+                break
+
+            except Exception as e:
+                QMessageBox.warning(None, "Profile Creation Error", "There was an error creating the profile. The operation has been aborted.", QMessageBox.Ok)
 
 
     # Adjusted function to remove a profile

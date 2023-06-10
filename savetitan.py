@@ -15,9 +15,9 @@ import logging
 
 
 from PyQt5 import QtWidgets, uic, QtCore
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction
+from PyQt5.QtGui import QIcon, QDesktopServices
+from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
 
 # Get the script's directory
@@ -198,7 +198,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
         launch_game(game_executable, save_slot)
 
 
-# Function to sync saves (copy local saves to cloud storage)
+# Function to sync saves (Copy local saves to cloud storage)
 def sync_save_cloud(game_profile, save_slot): 
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
     if not network_share_accessible():
@@ -228,6 +228,7 @@ def sync_save_cloud(game_profile, save_slot):
                 break
 
 
+# Function to sync saves (Copy cloud saves to local storage)
 def sync_save_local(source_folder, destination_folder):
     if not network_share_accessible():
         return
@@ -433,7 +434,6 @@ def show_config_dialog(config):
             flags |= Qt.ItemIsEditable
             return flags
 
-
     configprofileView = dialog.findChild(QtWidgets.QTableView, "configprofileView")
 
     headers = ["Profile Name", "Saves", "Mode", "ID"]
@@ -605,35 +605,38 @@ def show_config_dialog(config):
                                         QMessageBox.Ok)
 
 
-    # Function to remove a profile
-    def remove_profile():
-        selected_index = configprofileView.selectionModel().currentIndex()
-        if selected_index.isValid():
-            selected_profile = configprofileView.model().sourceModel()._data[selected_index.row()][0]
+    # Adjusted function to remove a profile
+    def remove_profile(profile_id=None):
+        config = configparser.ConfigParser()
+        config.read(profiles_config_file)
+
+        if not profile_id:
+            selected_index = configprofileView.selectionModel().currentIndex()
+            if selected_index.isValid():
+                profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][3]
+            else:
+                QMessageBox.warning(None, "No Profile Selected", "Please select a profile to remove.")
+                return
+
+        if profile_id in config.sections():
+            selected_profile = config.get(profile_id, 'name')
             confirm = QMessageBox.question(None, "Remove Profile", f"Are you sure you want to remove the profile '{selected_profile}'?", QMessageBox.Yes | QMessageBox.No)
             if confirm == QMessageBox.Yes:
-                config = configparser.ConfigParser()
-                config.read(profiles_config_file)
+                config.remove_section(profile_id)
+                with open(profiles_config_file, 'w') as configfile:
+                    config.write(configfile)
 
-                profile_id_to_remove = configprofileView.model().sourceModel()._data[selected_index.row()][3]
-
-                if profile_id_to_remove in config.sections():
-                    config.remove_section(profile_id_to_remove)
-                    with open(profiles_config_file, 'w') as configfile:
-                        config.write(configfile)
-
-                    source_model = configprofileView.model().sourceModel()
-                    row_to_remove = selected_index.row()
-
-                    source_model.beginRemoveRows(QModelIndex(), row_to_remove, row_to_remove)
-                    source_model._data.pop(row_to_remove)
-                    source_model.endRemoveRows()
-                else:
-                    QMessageBox.warning(None, "Profile Not Found", f"The profile '{selected_profile}' was not found in the configuration file.")
+                for row, data in enumerate(configprofileView.model().sourceModel()._data):
+                    if data[3] == profile_id:
+                        source_model = configprofileView.model().sourceModel()
+                        source_model.beginRemoveRows(QModelIndex(), row, row)
+                        source_model._data.pop(row)
+                        source_model.endRemoveRows()
+                        break
             else:
                 return
         else:
-            QMessageBox.warning(None, "No Profile Selected", "Please select a profile to remove.")
+            QMessageBox.warning(None, "Profile Not Found", f"The profile '{profile_id}' was not found in the configuration file.")
 
 
     # Function to open import profile dialog
@@ -657,6 +660,7 @@ def show_config_dialog(config):
         import_profile_dialog.listWidget.setEnabled(False)
 
 
+        # Function to write invalid profiles to log file
         def write_to_log(filepath, subfolder, message):
             with open(filepath, 'a') as f:
                 f.write(f"{subfolder}: {message}\n")
@@ -676,7 +680,6 @@ def show_config_dialog(config):
             if not cloud_storage_path:
                 return
 
-            # Check if the network share is accessible
             if not network_share_accessible():
                 QMessageBox.critical(None, "Network Error", 
                                      "An error occurred while trying to access the network share. Please check your connection and try again.")
@@ -790,7 +793,6 @@ def show_config_dialog(config):
                 if not cloud_storage_path:
                     return
 
-                # Check if the network share is accessible
                 if not network_share_accessible():
                     QMessageBox.critical(None, "Network Error", 
                                          "An error occurred while trying to access the network share. Please check your connection and try again.")
@@ -1100,6 +1102,52 @@ def show_config_dialog(config):
     dialog.importButton.clicked.connect(import_profile_dialog)
     dialog.settingsButton.clicked.connect(global_settings_dialog)
     dialog.applyButton.clicked.connect(save_profile_fields)
+
+    # Function to open a local save location in file explorer
+    def open_local_save_location(profile_id):
+        profile_info = read_config_file(profile_id)
+        _, local_save_folder, _, _, _, _ = profile_info
+        QDesktopServices.openUrl(QUrl.fromLocalFile(local_save_folder))
+
+    # Function to open a cloud storage location in file explorer
+    def open_cloud_location_storage(profile_id):
+        folder_path = os.path.join(cloud_storage_path, profile_id)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
+
+    # Function to create context menu
+    def context_menu(point):
+        # Create a QMenu object
+        menu = QMenu()
+
+        # Create actions
+        open_cloud_storage_action = QAction("Open Cloud Storage", menu)
+        open_local_save_action = QAction("Open Local Save", menu)
+        delete_profile_action = QAction("Delete Profile", menu)
+
+        # Get the currently selected profile id
+        selected_index = configprofileView.selectionModel().currentIndex()
+        if selected_index.isValid():
+            selected_profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][3]
+            
+            # Connect actions to functions
+            open_cloud_storage_action.triggered.connect(lambda: open_cloud_location_storage(selected_profile_id))
+            open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
+            delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
+
+            # Add actions to menu
+            menu.addAction(open_local_save_action)
+            menu.addAction(open_cloud_storage_action)
+            menu.addSeparator()  # This adds a separating line
+            menu.addAction(delete_profile_action)
+
+            # Show the context menu.
+            menu.exec_(configprofileView.viewport().mapToGlobal(point))
+        else:
+            QMessageBox.warning(None, "No Profile Selected", "Please select a profile first.")
+
+    # Attach the context menu to the configprofileView
+    configprofileView.setContextMenuPolicy(Qt.CustomContextMenu)
+    configprofileView.customContextMenuRequested.connect(context_menu)
     
     # Connections for configprofileView clicks
     configprofileView.selectionModel().currentChanged.connect(update_fields)

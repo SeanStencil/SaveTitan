@@ -1177,7 +1177,7 @@ if args.runprofile:
         game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
 
         if not cloud_storage_path:
-            print("Cloud storage path is not configured. Please run the script with the 'global' argument to configure it")
+            print("Run the script without a parameter to run the first-time setup. Cloud storage location is not defined")
             sys.exit(1)
         else:
             check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
@@ -1194,7 +1194,7 @@ elif args.runid:
         game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
 
         if not cloud_storage_path:
-            print("Cloud storage path is not configured. Please run the script with the 'global' argument to configure it")
+            print("Run the script without a parameter to run the first-time setup. Cloud storage location is not defined")
             sys.exit(1)
         else:
             check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)

@@ -592,7 +592,8 @@ def show_config_dialog(config):
             with open(profile_info_file_path, "w") as file:
                 profile_info_config.write(file)
 
-            new_save_name = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+            # Set the new save name to be "Save" plus the save slot number
+            new_save_name = f"Save {number_of_saves}"
             profile_info_config.set('saves', f'save{number_of_saves}', new_save_name)
                 
             with open(profile_info_file_path, "w") as file:
@@ -680,6 +681,12 @@ def show_config_dialog(config):
 
             new_save_name, ok = QInputDialog.getText(save_mgmt_dialog, "Rename Save", "Enter new save name:")
             if not ok or not new_save_name:
+                return
+
+            # Check if the new save name already exists
+            existing_save_names = [profile_info_config.get('saves', key).lower() for key in profile_info_config.options('saves')]
+            if new_save_name.lower() in existing_save_names:
+                QMessageBox.warning(None, "Name Already Exists", "A save with this name already exists. Please choose a different name.")
                 return
 
             profile_info_config.set('saves', selected_save_field, new_save_name)
@@ -1202,30 +1209,6 @@ def show_config_dialog(config):
         dialog.saveField.setText(save_folder)
 
 
-    # Update save slot for selected profile
-    def update_saveslot_combo():
-        selected_index = configprofileView.currentIndex()
-        if selected_index.isValid():
-            profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][4]
-            profiles_config = configparser.ConfigParser()
-            profiles_config.read(profiles_config_file)
-            
-            try:
-                profile = profiles_config[profile_id]
-                save_slot = profile.get("save_slot")
-                saves = profile.get("saves")
-            except Exception as e:
-                QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
-                return
-        
-        dialog.saveslotCombo.clear()
-        for i in range(1, int(saves) + 1):
-            item_text = f"Save {i}"
-            dialog.saveslotCombo.addItem(item_text)
-        
-        dialog.saveslotCombo.setCurrentIndex(int(save_slot) - 1)
-
-
     # Function to update fields in the edit profile section with selected profile
     def update_fields(index):
         if index.isValid():
@@ -1244,23 +1227,22 @@ def show_config_dialog(config):
             except Exception as e:
                 return
 
+
+    # Function to update fields in the edit profile section with selected profile
+    def update_fields(index):
+        if index.isValid():
+            row_data = configprofileView.model().sourceModel()._data[index.row()]
+            profile_id = row_data[2]
+
             try:
-                profile_info_config = configparser.ConfigParser()
-                profile_folder = os.path.join(cloud_storage_path, profile_id)
-                profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
+                name, local_save_folder, game_executable, save_slot, _, sync_mode = read_config_file(profile_id)
+            except Exception as e:
+                return
 
-                profile_info_config.read(profile_info_file_path)
-
-                dialog.saveslotCombo.clear()
-
-                for save_key, save_value in profile_info_config.items('saves'):
-                    dialog.saveslotCombo.addItem(save_value, userData=save_key)
-
-                for i in range(dialog.saveslotCombo.count()):
-                    if dialog.saveslotCombo.itemData(i) == f'save{save_slot}':
-                        dialog.saveslotCombo.setCurrentIndex(i)
-                        break
-
+            try:
+                dialog.profilenameField.setText(name)
+                dialog.executableField.setText(game_executable)
+                dialog.saveField.setText(local_save_folder)
             except Exception as e:
                 return
 
@@ -1285,7 +1267,6 @@ def show_config_dialog(config):
         profile_name = dialog.profilenameField.text()
         local_save_folder = dialog.saveField.text()
         game_executable = dialog.executableField.text()
-        save_slot = int(dialog.saveslotCombo.currentText().split()[1])
         sync_mode = config.get(profile_id, "sync_mode", fallback="Sync")
 
         for section in config.sections():
@@ -1297,7 +1278,65 @@ def show_config_dialog(config):
         config.set(profile_id, "name", profile_name)
         config.set(profile_id, "local_save_folder", local_save_folder)
         config.set(profile_id, "game_executable", game_executable)
-        config.set(profile_id, "save_slot", str(save_slot))
+        config.set(profile_id, "sync_mode", sync_mode)
+        save_config_file(config)
+
+        profile_folder = os.path.join(cloud_storage_path, profile_id)
+
+        profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
+        profile_info_config = configparser.ConfigParser()
+        profile_info_config.read(profile_info_file_path)
+
+        profile_info_config.set(profile_id, "name", profile_name)
+
+        profile_info_config.set(profile_id, "executable_name", os.path.basename(game_executable))
+
+        with open(profile_info_file_path, "w") as file:
+            profile_info_config.write(file)
+
+        configprofileView.model().sourceModel()._data = load_data_into_model_data()
+        
+        for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):
+            if configprofileView.model().sourceModel()._data[i][2] == profile_id:
+                new_index = configprofileView.model().index(i, 0)
+                configprofileView.setCurrentIndex(new_index)
+                update_fields(new_index)
+                break
+
+        QMessageBox.information(None, "Profile Saved", "The profile has been successfully saved.")
+
+
+    # Function to save field information to selected profile
+    def save_profile_fields():
+        selected_index = configprofileView.currentIndex()
+        if not selected_index.isValid():
+            QMessageBox.warning(None, "No Profile Selected", "Please select a profile to save the fields.")
+            return
+
+        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
+        profile_id = selected_row_data[2]
+
+        config = configparser.ConfigParser()
+        config.read(profiles_config_file)
+
+        if profile_id not in config.sections():
+            QMessageBox.warning(None, "Profile Not Found", "The selected profile does not exist.")
+            return
+
+        profile_name = dialog.profilenameField.text()
+        local_save_folder = dialog.saveField.text()
+        game_executable = dialog.executableField.text()
+        sync_mode = config.get(profile_id, "sync_mode", fallback="Sync")
+
+        for section in config.sections():
+            if section != profile_id and config.get(section, 'name').lower() == profile_name.lower():
+                QMessageBox.critical(None, "Profile Already Exists", 
+                                     "A profile with the same name already exists. Please choose a different name.")
+                return
+
+        config.set(profile_id, "name", profile_name)
+        config.set(profile_id, "local_save_folder", local_save_folder)
+        config.set(profile_id, "game_executable", game_executable)
         config.set(profile_id, "sync_mode", sync_mode)
         save_config_file(config)
 

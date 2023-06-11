@@ -1022,6 +1022,9 @@ def show_config_dialog(config):
             message_box.setText(message)
             center_dialog_over_dialog(import_profile_dialog, message_box)
             message_box.exec_()
+            
+            import_profile_dialog.progressBar.reset()
+            import_profile_dialog.progressBar.setMaximum(100)            
 
 
         # Function to import selected profile to profiles.ini

@@ -15,6 +15,7 @@ import glob
 import stat
 import logging
 
+
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem
 from PyQt5.QtGui import QIcon, QDesktopServices
@@ -325,9 +326,10 @@ def launch_game(game_executable, save_slot):
         done_button = message_box.addButton("Upload to Cloud", QMessageBox.AcceptRole)
         abort_button = message_box.addButton("Abort Sync", QMessageBox.RejectRole)
         
-        response = message_box.exec_()
+        clicked_button = message_box.exec_()
 
-        if response == QMessageBox.Accepted:
+        if clicked_button == done_button:
+            print("checking if accepted")
             sync_save_cloud(args.runprofile, save_slot)
 
     QTimer.singleShot(0, handle_dialog_response)

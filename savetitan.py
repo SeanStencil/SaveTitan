@@ -675,8 +675,8 @@ def show_config_dialog(config):
             with open(profiles_config_file, "w") as file:
                 config.write(file)
 
-            profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
-            profile_info_config = configparser.ConfigParser()
+            #profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
+            #profile_info_config = configparser.ConfigParser()
             profile_info_config.read(profile_info_file_path)
             profile_info_config.set(selected_profile_id, 'save_slot', new_save_slot)
             with open(profile_info_file_path, "w") as file:

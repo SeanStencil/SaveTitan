@@ -326,10 +326,9 @@ def launch_game(game_executable, save_slot):
         done_button = message_box.addButton("Upload to Cloud", QMessageBox.AcceptRole)
         abort_button = message_box.addButton("Abort Sync", QMessageBox.RejectRole)
         
-        clicked_button = message_box.exec_()
+        message_box.exec_()
 
-        if clicked_button == done_button:
-            print("checking if accepted")
+        if message_box.clickedButton() == done_button:
             sync_save_cloud(args.runprofile, save_slot)
 
     QTimer.singleShot(0, handle_dialog_response)

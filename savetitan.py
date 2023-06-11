@@ -13,9 +13,9 @@ import glob
 import stat
 import logging
 
-
+#from datetime import datetime
 from PyQt5 import QtWidgets, uic, QtCore
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem
 from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
@@ -31,7 +31,7 @@ global_config_file = os.path.join(script_dir, "global.ini")
 
 # Define Global Variables
 global cloud_storage_path
-
+game_profile_folder = 0
 
 # Generate a 16 character string for use for profile_id's
 def generate_id():
@@ -114,6 +114,10 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
         "executable_name": executable_name
     }
 
+    config["saves"] = {
+        "save1": "Save 1"
+    }
+
     config.remove_option(profile_id, "profile_id")
 
     try:
@@ -154,6 +158,7 @@ def make_backup_copy(original_folder):
 
 # Function to check and sync saves
 def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id):
+
     if not os.path.exists(local_save_folder):
         QMessageBox.critical(None, "Save Folder Not Found", "Local save folder does not exist. Please make sure your existing save files are located in the correct folder.")
         return
@@ -216,6 +221,34 @@ def sync_save_cloud(game_profile, save_slot):
 
             if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
                 match, mismatch, errors = filecmp.cmpfiles(local_save_folder, save_folder, comparison.common_files)
+                if len(mismatch) == 0 and len(errors) == 0:
+                    break
+            else:
+                raise Exception("Mismatch in directory contents")
+        except Exception as e:
+            reply = QMessageBox.critical(None, "Sync Error",
+                                         f"An error occurred during the sync process: {str(e)}",
+                                         QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+            if reply != QMessageBox.Retry:
+                break
+
+
+def sync_save_cloud_workaround(source_folder, destination_folder):
+    if not network_share_accessible():
+        return
+    while True:
+        try:
+            os.makedirs(destination_folder, exist_ok=True)
+
+            make_backup_copy(destination_folder)
+
+            shutil.rmtree(destination_folder)
+            shutil.copytree(source_folder, destination_folder)
+            
+            comparison = filecmp.dircmp(source_folder, destination_folder)
+
+            if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
+                match, mismatch, errors = filecmp.cmpfiles(source_folder, destination_folder, comparison.common_files)
                 if len(mismatch) == 0 and len(errors) == 0:
                     break
             else:
@@ -378,17 +411,17 @@ def show_config_dialog(config):
     global dialog
     dialog = uic.loadUi("config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-    
+
     # Get the DPI scaling factor
     app = QApplication.instance()
     screen = app.screens()[0]
     dpiScaling = screen.logicalDotsPerInch() / 96.0
-    
+
     # Adjust the size of the dialog based on the DPI scaling factor
     width = int(dialog.width() * dpiScaling)
     height = int(dialog.height() * dpiScaling)
     dialog.setFixedSize(width, height)
-    
+
     def load_data_into_model_data():
         profiles_config = configparser.ConfigParser()
         profiles_config.read(profiles_config_file)
@@ -397,11 +430,10 @@ def show_config_dialog(config):
         for section in profiles_config.sections():
             profile = profiles_config[section]
             name = profile.get("name")
-            saves = profile.get("saves")
             sync_mode = profile.get("sync_mode")
 
-            row = [name, saves, sync_mode, section]
-            
+            row = [name, sync_mode, section]
+
             data.append(row)
 
         return data
@@ -436,7 +468,7 @@ def show_config_dialog(config):
 
     configprofileView = dialog.findChild(QtWidgets.QTableView, "configprofileView")
 
-    headers = ["Profile Name", "Saves", "Mode", "ID"]
+    headers = ["Profile Name", "Mode", "Profile ID"]
 
     data = load_data_into_model_data()
                 
@@ -452,17 +484,16 @@ def show_config_dialog(config):
 
     header = configprofileView.horizontalHeader()
 
+    header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
     header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
     header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)
-    header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
-    header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
 
     configprofileView.resizeRowsToContents()
 
     if configprofileView.model().rowCount(QModelIndex()) > 0:
         selected_index = configprofileView.currentIndex()
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        selected_profile_id = selected_row_data[3]
+        selected_profile_id = selected_row_data[2]
 
     cloud_storage_path = read_global_config()
     if not cloud_storage_path:
@@ -506,6 +537,164 @@ def show_config_dialog(config):
         center_dialog_over_dialog(dialog, global_settings_dialog)
 
         global_settings_dialog.exec_()
+        
+        
+    # Function to open save management dialog
+    def save_mgmt_dialog(selected_profile_id):
+        save_mgmt_dialog = uic.loadUi("save_mgmt.ui")
+        save_mgmt_dialog.setWindowFlags(save_mgmt_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
+        save_mgmt_dialog.setFixedSize(save_mgmt_dialog.size())
+
+        config = configparser.ConfigParser()
+        config.read(profiles_config_file)
+        if selected_profile_id not in config.sections():
+            QMessageBox.warning(None, "Profile Not Found", "The selected profile does not exist.")
+            return
+
+        profile_info_config = configparser.ConfigParser()
+        profile_folder = os.path.join(cloud_storage_path, selected_profile_id)
+        profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
+
+        profile_info_config.read(profile_info_file_path)
+
+        save_mgmt_dialog.profilenameField.setText(profile_info_config.get(selected_profile_id, 'name'))
+        save_mgmt_dialog.saveField.setText(config.get(selected_profile_id, 'local_save_folder'))
+
+        save_slot = config.get(selected_profile_id, 'save_slot')
+        save_slot_key = f"save{save_slot}"
+
+        if 'saves' in profile_info_config.sections() and save_slot_key in profile_info_config['saves']:
+            save_mgmt_dialog.saveslotField.setText(profile_info_config.get('saves', save_slot_key))
+
+        center_dialog_over_dialog(QApplication.activeWindow(), save_mgmt_dialog)
+
+        if 'saves' in profile_info_config.sections():
+            saves_data = dict(profile_info_config['saves'])
+            for save_key, save_value in saves_data.items():
+                item = QListWidgetItem(save_value)
+                item.setData(Qt.UserRole, save_key)
+                save_mgmt_dialog.save_listWidget.addItem(item)
+
+
+        def handle_new_save_button():
+            confirm_msg = QMessageBox()
+            confirm_msg.setIcon(QMessageBox.Question)
+            confirm_msg.setText("Would you like to create a new save slot?")
+            confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            confirm_ret = confirm_msg.exec_()
+
+            if confirm_ret == QMessageBox.No:
+                return
+
+            number_of_saves = int(profile_info_config.get(selected_profile_id, "saves", fallback="0")) + 1
+            profile_info_config.set(selected_profile_id, "saves", str(number_of_saves))
+
+            with open(profile_info_file_path, "w") as file:
+                profile_info_config.write(file)
+
+            new_save_name = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+            profile_info_config.set('saves', f'save{number_of_saves}', new_save_name)
+                
+            with open(profile_info_file_path, "w") as file:
+                profile_info_config.write(file)
+
+            new_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f'save{number_of_saves}')
+            os.makedirs(new_save_folder, exist_ok=True)
+
+            item = QListWidgetItem(new_save_name)
+            item.setData(Qt.UserRole, f'save{number_of_saves}')
+            save_mgmt_dialog.save_listWidget.addItem(item)
+
+
+        def handle_load_save_button():
+            selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
+            if not selected_items:
+                return
+
+            selected_item = selected_items[0]
+            selected_save_key = selected_item.data(Qt.UserRole)
+
+            if selected_save_key == f"save{config.get(selected_profile_id, 'save_slot')}":
+                return
+
+            current_save_slot = config.get(selected_profile_id, 'save_slot')
+            local_save_folder = config.get(selected_profile_id, 'local_save_folder')
+
+            cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f"save{current_save_slot}")
+
+            reply = QMessageBox.question(None, "Upload current save?",
+                                         "Do you want to upload your current save before switching? Your local save will be replaced with the selected one.",
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+
+            if reply == QMessageBox.Yes:
+                sync_save_cloud_workaround(local_save_folder, cloud_save_folder)
+
+            config.set(selected_profile_id, 'save_slot', selected_save_key.replace('save', ''))
+            with open(profiles_config_file, "w") as file:
+                config.write(file)
+
+            save_mgmt_dialog.saveslotField.setText(selected_item.text())
+
+            new_cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, selected_save_key)
+            sync_save_local(new_cloud_save_folder, local_save_folder)
+
+            QMessageBox.information(None, "Load Finished", "The selected save has been loaded successfully.")
+
+
+        # Handle delete save button click
+        def handle_delete_save_button():
+            selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
+            if not selected_items:
+                return
+
+            selected_item = selected_items[0]
+            selected_save_key = selected_item.data(Qt.UserRole)
+
+            confirm_msg = QMessageBox()
+            confirm_msg.setIcon(QMessageBox.Question)
+            confirm_msg.setText("Are you sure you want to delete this save? This will remove the save from the cloud storage.")
+            confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            confirm_ret = confirm_msg.exec_()
+
+            if confirm_ret == QMessageBox.No:
+                return
+
+            profile_info_config.remove_option('saves', selected_save_key)
+
+            with open(profile_info_file_path, "w") as file:
+                profile_info_config.write(file)
+
+            shutil.rmtree(os.path.join(cloud_storage_path, selected_profile_id, selected_save_key))
+
+            list_item = save_mgmt_dialog.save_listWidget.takeItem(save_mgmt_dialog.save_listWidget.row(selected_item))
+            del list_item
+                
+
+        def handle_rename_save_button():
+            selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
+            if not selected_items:
+                return
+
+            selected_item = selected_items[0]
+            selected_save_field = selected_item.data(Qt.UserRole)
+
+            new_save_name, ok = QInputDialog.getText(save_mgmt_dialog, "Rename Save", "Enter new save name:")
+            if not ok or not new_save_name:
+                return
+
+            profile_info_config.set('saves', selected_save_field, new_save_name)
+
+            with open(profile_info_file_path, "w") as file:
+                profile_info_config.write(file)
+
+            selected_item.setText(new_save_name)
+
+        save_mgmt_dialog.newsaveButton.clicked.connect(handle_new_save_button)
+        save_mgmt_dialog.loadsaveButton.clicked.connect(handle_load_save_button)
+        save_mgmt_dialog.renamesaveButton.clicked.connect(handle_rename_save_button)
+        save_mgmt_dialog.deletesaveButton.clicked.connect(handle_delete_save_button)
+
+        save_mgmt_dialog.exec_()
 
 
     # Function to add a profile
@@ -594,7 +783,7 @@ def show_config_dialog(config):
                 }
                 save_config_file(config)
 
-                new_row_data = [profile_name, str(saves), sync_mode, profile_id]
+                new_row_data = [profile_name, sync_mode, profile_id]
                 configprofileView.model().sourceModel()._data.append(new_row_data)
                 configprofileView.model().sourceModel().layoutChanged.emit()
                 configprofileView.reset()
@@ -612,21 +801,21 @@ def show_config_dialog(config):
         if not profile_id:
             selected_index = configprofileView.selectionModel().currentIndex()
             if selected_index.isValid():
-                profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][3]
+                profile_id = configprofileView.model().sourceModel()._data[selected_index.row()][2]
             else:
                 QMessageBox.warning(None, "No Profile Selected", "Please select a profile to remove.")
                 return
 
         if profile_id in config.sections():
             selected_profile = config.get(profile_id, 'name')
-            confirm = QMessageBox.question(None, "Remove Profile", f"Are you sure you want to remove the profile '{selected_profile}'?", QMessageBox.Yes | QMessageBox.No)
+            confirm = QMessageBox.question(None, "Remove Profile", f"Are you sure you want to remove the profile '{selected_profile}'? (Note this will not delete the folder from the cloud save location)", QMessageBox.Yes | QMessageBox.No)
             if confirm == QMessageBox.Yes:
                 config.remove_section(profile_id)
                 with open(profiles_config_file, 'w') as configfile:
                     config.write(configfile)
 
                 for row, data in enumerate(configprofileView.model().sourceModel()._data):
-                    if data[3] == profile_id:
+                    if data[2] == profile_id:
                         source_model = configprofileView.model().sourceModel()
                         source_model.beginRemoveRows(QModelIndex(), row, row)
                         source_model._data.pop(row)
@@ -883,7 +1072,7 @@ def show_config_dialog(config):
                     profiles_config.write(configfile)
 
                 QMessageBox.information(None, "Success", "Profile imported successfully.")
-                new_row_data = [profile_name, saves, sync_mode, profile_id]
+                new_row_data = [profile_name, sync_mode, profile_id]
                 configprofileView.model().sourceModel()._data.append(new_row_data)
 
                 configprofileView.model().sourceModel().layoutChanged.emit()
@@ -933,7 +1122,7 @@ def show_config_dialog(config):
             return
 
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        profile_id = selected_row_data[3]
+        profile_id = selected_row_data[2]
 
         config = configparser.ConfigParser()
         config.read(profiles_config_file)
@@ -945,7 +1134,7 @@ def show_config_dialog(config):
             return
 
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        profile_id = selected_row_data[3]
+        profile_id = selected_row_data[2]
 
         try:
             profile_name = config.get(profile_id, "name")
@@ -986,7 +1175,7 @@ def show_config_dialog(config):
             return
 
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        profile_id = selected_row_data[3]
+        profile_id = selected_row_data[2]
 
         config = configparser.ConfigParser()
         config.read(profiles_config_file)
@@ -1041,10 +1230,10 @@ def show_config_dialog(config):
     def update_fields(index):
         if index.isValid():
             row_data = configprofileView.model().sourceModel()._data[index.row()]
-            profile_id = row_data[3]
+            profile_id = row_data[2]
 
             try:
-                name, local_save_folder, game_executable, save_slot, saves, sync_mode = read_config_file(profile_id)
+                name, local_save_folder, game_executable, save_slot, _, sync_mode = read_config_file(profile_id)
             except Exception as e:
                 return
 
@@ -1056,13 +1245,22 @@ def show_config_dialog(config):
                 return
 
             try:
-                dialog.saveslotCombo.clear()
-                for slot in range(1, int(saves) + 1):
-                    dialog.saveslotCombo.addItem(f'Save {slot}')
+                profile_info_config = configparser.ConfigParser()
+                profile_folder = os.path.join(cloud_storage_path, profile_id)
+                profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
 
-                combo_index = dialog.saveslotCombo.findText(f'Save {save_slot}')
-                if combo_index != -1:
-                    dialog.saveslotCombo.setCurrentIndex(combo_index)
+                profile_info_config.read(profile_info_file_path)
+
+                dialog.saveslotCombo.clear()
+
+                for save_key, save_value in profile_info_config.items('saves'):
+                    dialog.saveslotCombo.addItem(save_value, userData=save_key)
+
+                for i in range(dialog.saveslotCombo.count()):
+                    if dialog.saveslotCombo.itemData(i) == f'save{save_slot}':
+                        dialog.saveslotCombo.setCurrentIndex(i)
+                        break
+
             except Exception as e:
                 return
 
@@ -1075,7 +1273,7 @@ def show_config_dialog(config):
             return
 
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        profile_id = selected_row_data[3]
+        profile_id = selected_row_data[2]
 
         config = configparser.ConfigParser()
         config.read(profiles_config_file)
@@ -1119,7 +1317,7 @@ def show_config_dialog(config):
         configprofileView.model().sourceModel()._data = load_data_into_model_data()
         
         for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):
-            if configprofileView.model().sourceModel()._data[i][3] == profile_id:
+            if configprofileView.model().sourceModel()._data[i][2] == profile_id:
                 new_index = configprofileView.model().index(i, 0)
                 configprofileView.setCurrentIndex(new_index)
                 update_fields(new_index)
@@ -1127,9 +1325,6 @@ def show_config_dialog(config):
 
         QMessageBox.information(None, "Profile Saved", "The profile has been successfully saved.")
 
-
-    # Temporary disables
-    dialog.saveslotCombo.setEnabled(False)
 
     # Connections for button clicks
     dialog.executablefieldButton.clicked.connect(update_executable)
@@ -1151,6 +1346,7 @@ def show_config_dialog(config):
         folder_path = os.path.join(cloud_storage_path, profile_id)
         QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
 
+
     # Function to create context menu
     def context_menu(point):
         menu = QMenu()
@@ -1158,22 +1354,27 @@ def show_config_dialog(config):
         open_cloud_storage_action = QAction("Open Cloud Storage", menu)
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
+        open_save_mgmt_action = QAction("Open Save Manager", menu)
 
         index = configprofileView.indexAt(point)
         
         if index.isValid():
-            selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][3]
+            selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][2]
 
             open_cloud_storage_action.triggered.connect(lambda: open_cloud_location_storage(selected_profile_id))
             open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
             delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
+            open_save_mgmt_action.triggered.connect(lambda: save_mgmt_dialog(selected_profile_id))
 
             menu.addAction(open_local_save_action)
             menu.addAction(open_cloud_storage_action)
             menu.addSeparator()
+            menu.addAction(open_save_mgmt_action)
+            menu.addSeparator()
             menu.addAction(delete_profile_action)
 
             menu.exec_(configprofileView.viewport().mapToGlobal(point))
+
 
     configprofileView.setContextMenuPolicy(Qt.CustomContextMenu)
     configprofileView.customContextMenuRequested.connect(context_menu)
@@ -1191,6 +1392,7 @@ def show_config_dialog(config):
 parser = argparse.ArgumentParser()
 parser.add_argument("-runprofile", help="Specify the game profile to be used")
 parser.add_argument("-runid", help="Specify the profile ID to be used")
+parser.add_argument("-list", action='store_true', help="List all profiles in profiles.ini")
 args = parser.parse_args()
 
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
@@ -1201,7 +1403,14 @@ config = configparser.ConfigParser()
 config.read(profiles_config_file)
 cloud_storage_path = read_global_config()
 
-if args.runprofile:
+if args.list:
+    for section in config.sections():
+        profile_id = section
+        name = config.get(section, 'name')
+        save_slot = config.get(section, 'save_slot')
+        print(f"{profile_id} - {name} - Save Slot: {save_slot}")
+    sys.exit(1)
+elif args.runprofile:
     existing_profiles = [section for section in config.sections() if config[section]['name'].lower() == args.runprofile.lower()]
     if not existing_profiles:
         print("The specified game profile does not exist in profiles.ini")

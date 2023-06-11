@@ -149,6 +149,9 @@
     <string>Mode</string>
    </property>
    <widget class="QRadioButton" name="backupRadio">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
     <property name="geometry">
      <rect>
       <x>70</x>

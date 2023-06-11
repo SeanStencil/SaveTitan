@@ -239,6 +239,7 @@ def sync_save_cloud(game_profile, save_slot):
             if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
                 match, mismatch, errors = filecmp.cmpfiles(local_save_folder, save_folder, comparison.common_files)
                 if len(mismatch) == 0 and len(errors) == 0:
+                    print("Sync completed successfully.")
                     break
             else:
                 raise Exception("Mismatch in directory contents")
@@ -315,8 +316,16 @@ def launch_game(game_executable, save_slot):
     subprocess.Popen(game_executable)
 
     def handle_dialog_response():
-        dialog_result = QMessageBox.information(None, "Game in Progress", "Please click 'I'm done' when you have finished playing.")
-        if dialog_result == QMessageBox.Ok:
+        message_box = QMessageBox()
+        message_box.setWindowTitle("Game in Progress")
+        message_box.setText("Please click 'Upload to Cloud' when you have finished playing.")
+        
+        done_button = message_box.addButton("Upload to Cloud", QMessageBox.AcceptRole)
+        abort_button = message_box.addButton("Abort Sync", QMessageBox.RejectRole)
+        
+        response = message_box.exec_()
+
+        if response == QMessageBox.Accepted:
             sync_save_cloud(args.runprofile, save_slot)
 
     QTimer.singleShot(0, handle_dialog_response)

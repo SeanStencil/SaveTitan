@@ -156,7 +156,6 @@ def make_backup_copy(original_folder):
 
 # Function to check and sync saves
 def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id):
-
     if not os.path.exists(local_save_folder):
         QMessageBox.critical(None, "Save Folder Not Found", "Local save folder does not exist. Please make sure your existing save files are located in the correct folder.")
         return
@@ -172,31 +171,51 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
         local_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(local_save_folder))
         cloud_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(game_profile_folder_save_slot))
 
-        comparison = filecmp.dircmp(local_save_folder, game_profile_folder_save_slot)
-        if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-            launch_game(game_executable, save_slot)
+        files_identical = True
+        for dirpath, dirnames, filenames in os.walk(local_save_folder):
+            for filename in filenames:
+                local_file = os.path.join(dirpath, filename)
+                cloud_file = os.path.join(game_profile_folder_save_slot, os.path.relpath(local_file, local_save_folder))
+                if os.path.exists(cloud_file):
+                    if not filecmp.cmp(local_file, cloud_file, shallow=False):
+                        files_identical = False
+                        break
+            if not files_identical:
+                break
+
+        if files_identical:
+            local_files_count = len(os.listdir(local_save_folder))
+            cloud_files_count = len(os.listdir(game_profile_folder_save_slot))
+            
+            if local_files_count > cloud_files_count:
+                launch_game(game_executable, save_slot)
+            elif cloud_files_count > local_files_count:
+                sync_save_local(game_profile_folder_save_slot, local_save_folder)
+                launch_game(game_executable, save_slot)
+            else:
+                launch_game(game_executable, save_slot)
         else:
             local_save_time_str = local_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
             cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
 
+            sync_diag = uic.loadUi("sync_diag.ui")
+            sync_diag.local_date.setText(local_save_time_str)
+            sync_diag.cloud_date.setText(cloud_save_time_str)
+
             if local_save_time > cloud_save_time:
-                reply = QMessageBox.question(None, "LOCAL SAVE IS NEWER",
-                                             f"The local save (last modified: {local_save_time_str}) is newer than the one in cloud storage (last modified: {cloud_save_time_str}). Do you want to keep your local save?",
-                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                if reply == QMessageBox.Yes:
-                    launch_game(game_executable, save_slot)
-                else:
-                    sync_save_local(game_profile_folder_save_slot, local_save_folder)
-                    launch_game(game_executable, save_slot)
+                sync_diag.local_indication.setText("Newer")
+                sync_diag.cloud_indication.setText("Older")
             else:
-                reply = QMessageBox.question(None, "CLOUD SAVE IS NEWER",
-                                             f"The cloud save (last modified: {cloud_save_time_str}) is newer than the one in local save (last modified: {local_save_time_str}). Do you want to download your cloud save?",
-                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                if reply == QMessageBox.Yes:
-                    sync_save_local(game_profile_folder_save_slot, local_save_folder)
-                    launch_game(game_executable, save_slot)
-                else:
-                    launch_game(game_executable, save_slot)
+                sync_diag.local_indication.setText("Older")
+                sync_diag.cloud_indication.setText("Newer")
+
+            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), sync_diag.close()])
+            sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot), sync_diag.close()])
+            sync_diag.nosyncButton.clicked.connect(lambda: [launch_game_without_sync(game_executable), sync_diag.close()])
+
+            sync_diag.rejected.connect(lambda: sys.exit())
+            
+            sync_diag.exec_()
     else:
         launch_game(game_executable, save_slot)
 
@@ -209,9 +228,9 @@ def sync_save_cloud(game_profile, save_slot):
     while True:
         try:
             os.makedirs(save_folder, exist_ok=True)
-
+            
             make_backup_copy(save_folder)
-
+            
             shutil.rmtree(save_folder)
             shutil.copytree(local_save_folder, save_folder)
             
@@ -301,6 +320,15 @@ def launch_game(game_executable, save_slot):
             sync_save_cloud(args.runprofile, save_slot)
 
     QTimer.singleShot(0, handle_dialog_response)
+
+
+# Function to launch the game without syncing
+def launch_game_without_sync(game_executable):
+    if not check_execute_permissions(game_executable, 'game executable'):
+        return
+
+    subprocess.Popen(game_executable)
+    sys.exit()
 
 
 # Read the profiles configuration file and retrieve the profile information
@@ -590,7 +618,6 @@ def show_config_dialog(config):
             with open(profile_info_file_path, "w") as file:
                 profile_info_config.write(file)
 
-            # Set the new save name to be "Save" plus the save slot number
             new_save_name = f"Save {number_of_saves}"
             profile_info_config.set('saves', f'save{number_of_saves}', new_save_name)
                 
@@ -621,9 +648,24 @@ def show_config_dialog(config):
 
             cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f"save{current_save_slot}")
 
-            reply = QMessageBox.question(None, "Upload current save?",
-                                         "Do you want to upload your current save before switching? Your local save will be replaced with the selected one.",
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
+            profile_info_config = configparser.ConfigParser()
+            profile_info_config.read(profile_info_file_path)
+            old_save_slot_name = profile_info_config.get('saves', f'save{current_save_slot}')
+            new_save_slot_name = profile_info_config.get('saves', selected_save_key)
+
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Question)
+            msg_box.setWindowTitle("Load Save Confirmation")
+            msg_box.setText(f"This action will overwrite the local save folder with the contents of {new_save_slot_name}. Do you want to upload your local files to save slot {old_save_slot_name}?")
+            msg_box.addButton(QMessageBox.Yes)
+            msg_box.addButton(QMessageBox.No)
+            abort_button = msg_box.addButton("Abort Load", QMessageBox.RejectRole)
+            msg_box.setDefaultButton(QMessageBox.Yes)
+            reply = msg_box.exec_()
+
+            if msg_box.clickedButton() == abort_button:
+                return
 
             if reply == QMessageBox.Yes:
                 sync_save_cloud_workaround(local_save_folder, cloud_save_folder)
@@ -633,7 +675,6 @@ def show_config_dialog(config):
             with open(profiles_config_file, "w") as file:
                 config.write(file)
 
-            # Update save_slot in profile_info.savetitan
             profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
             profile_info_config = configparser.ConfigParser()
             profile_info_config.read(profile_info_file_path)
@@ -1115,7 +1156,7 @@ def show_config_dialog(config):
         about.setTextFormat(Qt.RichText)
 
         about_text = """
-        <h1><span style="font-weight:600; font-family:Arial; color:#555;">SaveTitan v0.10</span></h1>
+        <span style="font-weight:600; font-family:Arial; color:#555;">SaveTitan v0.10</span>
         <p>
         SaveTitan is a powerful game save management tool that allows you to sync your game saves between local storage and cloud storage. 
         It is designed for granularity and control so you get the best experience jumping from device to device.
@@ -1123,6 +1164,7 @@ def show_config_dialog(config):
         <p>
         By Sean Bowman
         </p>
+        <p><span style="font-size:10px;"><a href="https://www.flaticon.com/free-icons/storage style="color:#36AE7C;" title="storage icons">Storage icons created by Hilmy Abiyyu A. - Flaticon</a></span></p>
         """
         about.setText(about_text)
         center_dialog_over_dialog(config_dialog, about)

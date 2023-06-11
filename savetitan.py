@@ -382,8 +382,14 @@ def read_global_config():
 
 # Function to set the cloud storage location
 def set_cloud_storage_path():
+    config = configparser.ConfigParser()
+    config.read(global_config_file)
+    current_cloud_storage_path = config.get("Global Settings", "cloud_storage_path", fallback="")
+    if not os.path.isdir(current_cloud_storage_path):
+        current_cloud_storage_path = ""
+        
     while True:
-        cloud_storage_path = QFileDialog.getExistingDirectory(None, "Select Cloud Storage Path")
+        cloud_storage_path = QFileDialog.getExistingDirectory(None, "Select Cloud Storage Path", current_cloud_storage_path)
         if not cloud_storage_path:
             break
 
@@ -415,7 +421,6 @@ def set_cloud_storage_path():
             else:
                 continue
 
-        config = configparser.ConfigParser()
         config["Global Settings"] = {"cloud_storage_path": cloud_storage_path}
         with open(global_config_file, "w") as file:
             config.write(file)

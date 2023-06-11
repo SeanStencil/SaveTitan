@@ -13,7 +13,6 @@ import glob
 import stat
 import logging
 
-#from datetime import datetime
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem
 from PyQt5.QtGui import QIcon, QDesktopServices
@@ -31,7 +30,6 @@ global_config_file = os.path.join(script_dir, "global.ini")
 
 # Define Global Variables
 global cloud_storage_path
-game_profile_folder = 0
 
 # Generate a 16 character string for use for profile_id's
 def generate_id():
@@ -630,9 +628,18 @@ def show_config_dialog(config):
             if reply == QMessageBox.Yes:
                 sync_save_cloud_workaround(local_save_folder, cloud_save_folder)
 
-            config.set(selected_profile_id, 'save_slot', selected_save_key.replace('save', ''))
+            new_save_slot = selected_save_key.replace('save', '')
+            config.set(selected_profile_id, 'save_slot', new_save_slot)
             with open(profiles_config_file, "w") as file:
                 config.write(file)
+
+            # Update save_slot in profile_info.savetitan
+            profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
+            profile_info_config = configparser.ConfigParser()
+            profile_info_config.read(profile_info_file_path)
+            profile_info_config.set(selected_profile_id, 'save_slot', new_save_slot)
+            with open(profile_info_file_path, "w") as file:
+                profile_info_config.write(file)
 
             save_mgmt_dialog.saveslotField.setText(selected_item.text())
 
@@ -975,10 +982,18 @@ def show_config_dialog(config):
 
                 profile_id = config.sections()[0]
                 profile_name = config.get(profile_id, "name")
-                save_slot = config.get(profile_id, "save_slot")
                 saves = config.get(profile_id, "saves")
                 executable_name = config.get(profile_id, "executable_name")
                 sync_mode = config.get(profile_id, "sync_mode")
+
+                cloud_storage_path = read_global_config()
+                if not cloud_storage_path:
+                    return
+
+                profile_info_file_path = os.path.join(cloud_storage_path, profile_id, "profile_info.savetitan")
+                profile_info_config = configparser.ConfigParser()
+                profile_info_config.read(profile_info_file_path)
+                save_slot = profile_info_config.get(profile_id, "save_slot")
 
                 profiles_config = configparser.ConfigParser()
                 profiles_config.read(profiles_config_file)
@@ -995,10 +1010,6 @@ def show_config_dialog(config):
                     file_filter = "Executable Files (*.app *.command)"
                 else:
                     file_filter = "Executable Files (*.sh *.AppImage)"
-
-                cloud_storage_path = read_global_config()
-                if not cloud_storage_path:
-                    return
 
                 if not network_share_accessible():
                     QMessageBox.critical(None, "Network Error", 
@@ -1283,9 +1294,10 @@ def show_config_dialog(config):
 
         profile_folder = os.path.join(cloud_storage_path, profile_id)
 
-        profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
+        profile_info_file_path = os.path.join(cloud_storage_path, profile_id, "profile_info.savetitan")
         profile_info_config = configparser.ConfigParser()
         profile_info_config.read(profile_info_file_path)
+        save_slot = profile_info_config.get(profile_id, "save_slot")
 
         profile_info_config.set(profile_id, "name", profile_name)
 

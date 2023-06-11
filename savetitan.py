@@ -387,6 +387,11 @@ def set_cloud_storage_path():
         if not cloud_storage_path:
             break
 
+        if not os.path.exists(cloud_storage_path):
+            QMessageBox.warning(None, "Invalid Path",
+                                "The selected path does not exist. Please select another path.")
+            continue
+
         subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
         savetitan_files_found = False
         for subfolder in subfolders:
@@ -395,17 +400,20 @@ def set_cloud_storage_path():
                 savetitan_files_found = True
                 break
 
-        if not savetitan_files_found:
-            if len(os.listdir(cloud_storage_path)) > 0:
-                response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
-                                               "WARNING: The selected cloud storage path is not empty. "
-                                               "Would you like to create a new SaveTitan directory in it?",
-                                               QMessageBox.Yes | QMessageBox.No)
-                if response == QMessageBox.Yes:
-                    cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
-                    os.makedirs(cloud_storage_path, exist_ok=True)
-                else:
-                    continue
+        if savetitan_files_found:
+            QMessageBox.information(None, "Existing SaveTitan Cloud Folder Detected",
+                                    "This appears to be an existing SaveTitan cloud folder. "
+                                    "Make sure to use the 'Import' button to import existing profiles.")
+        elif not savetitan_files_found and len(os.listdir(cloud_storage_path)) > 0:
+            response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
+                                           "WARNING: The selected cloud storage path is not empty. "
+                                           "Would you like to create a new SaveTitan directory in it?",
+                                           QMessageBox.Yes | QMessageBox.No)
+            if response == QMessageBox.Yes:
+                cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
+                os.makedirs(cloud_storage_path, exist_ok=True)
+            else:
+                continue
 
         config = configparser.ConfigParser()
         config["Global Settings"] = {"cloud_storage_path": cloud_storage_path}
@@ -1428,11 +1436,13 @@ def show_config_dialog(config):
     dialog.settingsButton.clicked.connect(global_settings_dialog)
     dialog.applyButton.clicked.connect(save_profile_fields)
 
+
     # Function to open a local save location in file explorer
     def open_local_save_location(profile_id):
         profile_info = read_config_file(profile_id)
         _, local_save_folder, _, _, _, _ = profile_info
         QDesktopServices.openUrl(QUrl.fromLocalFile(local_save_folder))
+
 
     # Function to open a cloud storage location in file explorer
     def open_cloud_location_storage(profile_id):

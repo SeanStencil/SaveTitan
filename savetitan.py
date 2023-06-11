@@ -209,9 +209,9 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                 sync_diag.local_indication.setText("Older")
                 sync_diag.cloud_indication.setText("Newer")
 
-            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), sync_diag.close()])
-            sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot), sync_diag.close()])
-            sync_diag.nosyncButton.clicked.connect(lambda: [launch_game_without_sync(game_executable), sync_diag.close()])
+            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), launch_game(game_executable, save_slot), sync_diag.accept()])
+            sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot), sync_diag.accept()])
+            sync_diag.nosyncButton.clicked.connect(lambda: [launch_game_without_sync(game_executable), sync_diag.accept()])
 
             sync_diag.rejected.connect(lambda: sys.exit())
             
@@ -584,6 +584,9 @@ def show_config_dialog(config):
         save_mgmt_dialog.setWindowFlags(save_mgmt_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         save_mgmt_dialog.setFixedSize(save_mgmt_dialog.size())
 
+        if not network_share_accessible():
+            return
+
         config = configparser.ConfigParser()
         config.read(profiles_config_file)
         if selected_profile_id not in config.sections():
@@ -593,6 +596,9 @@ def show_config_dialog(config):
         profile_info_config = configparser.ConfigParser()
         profile_folder = os.path.join(cloud_storage_path, selected_profile_id)
         profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
+
+        if not check_read_permissions(profile_info_file_path, "profile info file"):
+            return
 
         profile_info_config.read(profile_info_file_path)
 
@@ -614,7 +620,6 @@ def show_config_dialog(config):
                 item.setData(Qt.UserRole, save_key)
                 save_mgmt_dialog.save_listWidget.addItem(item)
 
-
         def handle_new_save_button():
             confirm_msg = QMessageBox()
             confirm_msg.setIcon(QMessageBox.Question)
@@ -629,12 +634,16 @@ def show_config_dialog(config):
             profile_info_config.set(selected_profile_id, "saves", str(number_of_saves))
 
             with open(profile_info_file_path, "w") as file:
+                if not check_write_permissions(profile_info_file_path, "profile info file"):
+                    return
                 profile_info_config.write(file)
 
             new_save_name = f"Save {number_of_saves}"
             profile_info_config.set('saves', f'save{number_of_saves}', new_save_name)
                 
             with open(profile_info_file_path, "w") as file:
+                if not check_write_permissions(profile_info_file_path, "profile info file"):
+                    return
                 profile_info_config.write(file)
 
             new_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f'save{number_of_saves}')
@@ -644,7 +653,6 @@ def show_config_dialog(config):
             item.setData(Qt.UserRole, f'save{number_of_saves}')
             save_mgmt_dialog.save_listWidget.addItem(item)
 
-
         def handle_load_save_button():
             selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
             if not selected_items:
@@ -653,84 +661,59 @@ def show_config_dialog(config):
             selected_item = selected_items[0]
             selected_save_key = selected_item.data(Qt.UserRole)
 
-            if selected_save_key == f"save{config.get(selected_profile_id, 'save_slot')}":
+            if selected_save_key == save_slot_key:
                 return
 
-            current_save_slot = config.get(selected_profile_id, 'save_slot')
-            local_save_folder = config.get(selected_profile_id, 'local_save_folder')
+            config.set(selected_profile_id, 'save_slot', selected_save_key[4:])
 
-            cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f"save{current_save_slot}")
-
-            profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
-            profile_info_config = configparser.ConfigParser()
-            profile_info_config.read(profile_info_file_path)
-            old_save_slot_name = profile_info_config.get('saves', f'save{current_save_slot}')
-            new_save_slot_name = profile_info_config.get('saves', selected_save_key)
-
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Question)
-            msg_box.setWindowTitle("Load Save Confirmation")
-            msg_box.setText(f"This action will overwrite the local save folder with the contents of {new_save_slot_name}. Do you want to upload your local files to save slot {old_save_slot_name}?")
-            msg_box.addButton(QMessageBox.Yes)
-            msg_box.addButton(QMessageBox.No)
-            abort_button = msg_box.addButton("Abort Load", QMessageBox.RejectRole)
-            msg_box.setDefaultButton(QMessageBox.Yes)
-            reply = msg_box.exec_()
-
-            if msg_box.clickedButton() == abort_button:
-                return
-
-            if reply == QMessageBox.Yes:
-                sync_save_cloud_workaround(local_save_folder, cloud_save_folder)
-
-            new_save_slot = selected_save_key.replace('save', '')
-            config.set(selected_profile_id, 'save_slot', new_save_slot)
             with open(profiles_config_file, "w") as file:
+                if not check_write_permissions(profiles_config_file, "profile config file"):
+                    return
                 config.write(file)
 
-            #profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
-            #profile_info_config = configparser.ConfigParser()
-            profile_info_config.read(profile_info_file_path)
-            profile_info_config.set(selected_profile_id, 'save_slot', new_save_slot)
+            save_mgmt_dialog.saveslotField.setText(selected_item.text())
+            
             with open(profile_info_file_path, "w") as file:
+                if not check_write_permissions(profile_info_file_path, "profile info file"):
+                    return
                 profile_info_config.write(file)
 
-            save_mgmt_dialog.saveslotField.setText(selected_item.text())
-
-            new_cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, selected_save_key)
-            sync_save_local(new_cloud_save_folder, local_save_folder)
-
-            QMessageBox.information(None, "Load Finished", "The selected save has been loaded successfully.")
-
-
-        # Handle delete save button click
         def handle_delete_save_button():
             selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
             if not selected_items:
                 return
 
-            selected_item = selected_items[0]
-            selected_save_key = selected_item.data(Qt.UserRole)
-
             confirm_msg = QMessageBox()
             confirm_msg.setIcon(QMessageBox.Question)
-            confirm_msg.setText("Are you sure you want to delete this save? This will remove the save from the cloud storage.")
+            confirm_msg.setText("Are you sure you want to delete this save slot?")
             confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
             confirm_ret = confirm_msg.exec_()
 
             if confirm_ret == QMessageBox.No:
                 return
 
+            selected_item = selected_items[0]
+            selected_save_key = selected_item.data(Qt.UserRole)
+
             profile_info_config.remove_option('saves', selected_save_key)
 
             with open(profile_info_file_path, "w") as file:
+                if not check_write_permissions(profile_info_file_path, "profile info file"):
+                    return
                 profile_info_config.write(file)
 
-            shutil.rmtree(os.path.join(cloud_storage_path, selected_profile_id, selected_save_key))
+            row = save_mgmt_dialog.save_listWidget.row(selected_item)
+            save_mgmt_dialog.save_listWidget.takeItem(row)
 
-            list_item = save_mgmt_dialog.save_listWidget.takeItem(save_mgmt_dialog.save_listWidget.row(selected_item))
-            del list_item
-                
+            if selected_save_key == save_slot_key:
+                config.remove_option(selected_profile_id, 'save_slot')
+
+                with open(profiles_config_file, "w") as file:
+                    if not check_write_permissions(profiles_config_file, "profile config file"):
+                        return
+                    config.write(file)
+
+                save_mgmt_dialog.saveslotField.clear()
 
         def handle_rename_save_button():
             selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
@@ -738,31 +721,30 @@ def show_config_dialog(config):
                 return
 
             selected_item = selected_items[0]
-            selected_save_field = selected_item.data(Qt.UserRole)
+            selected_save_key = selected_item.data(Qt.UserRole)
 
-            new_save_name, ok = QInputDialog.getText(save_mgmt_dialog, "Rename Save", "Enter new save name:")
+            new_save_name, ok = QInputDialog.getText(None, "Rename Save Slot", "Enter new name:")
             if not ok or not new_save_name:
                 return
 
-            # Check if the new save name already exists
-            existing_save_names = [profile_info_config.get('saves', key).lower() for key in profile_info_config.options('saves')]
-            if new_save_name.lower() in existing_save_names:
-                QMessageBox.warning(None, "Name Already Exists", "A save with this name already exists. Please choose a different name.")
-                return
-
-            profile_info_config.set('saves', selected_save_field, new_save_name)
-
+            profile_info_config.set('saves', selected_save_key, new_save_name)
+            
             with open(profile_info_file_path, "w") as file:
+                if not check_write_permissions(profile_info_file_path, "profile info file"):
+                    return
                 profile_info_config.write(file)
 
             selected_item.setText(new_save_name)
 
-        save_mgmt_dialog.newsaveButton.clicked.connect(handle_new_save_button)
-        save_mgmt_dialog.loadsaveButton.clicked.connect(handle_load_save_button)
-        save_mgmt_dialog.renamesaveButton.clicked.connect(handle_rename_save_button)
-        save_mgmt_dialog.deletesaveButton.clicked.connect(handle_delete_save_button)
+            if selected_save_key == save_slot_key:
+                save_mgmt_dialog.saveslotField.setText(new_save_name)
 
-        save_mgmt_dialog.exec_()
+        save_mgmt_dialog.newSaveButton.clicked.connect(handle_new_save_button)
+        save_mgmt_dialog.loadSaveButton.clicked.connect(handle_load_save_button)
+        save_mgmt_dialog.deleteSaveButton.clicked.connect(handle_delete_save_button)
+        save_mgmt_dialog.renameSaveButton.clicked.connect(handle_rename_save_button)
+
+        save_mgmt_dialog.exec()
 
 
     # Function to add a profile

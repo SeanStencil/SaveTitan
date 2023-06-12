@@ -14,7 +14,7 @@ import stat
 import logging
 import socket
 
-
+from datetime import datetime, timedelta
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem
 from PyQt5.QtGui import QIcon, QDesktopServices
@@ -219,6 +219,9 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                     if not filecmp.cmp(local_file, cloud_file, shallow=False):
                         files_identical = False
                         break
+                else:
+                    files_identical = False
+                    break
             if not files_identical:
                 break
 
@@ -234,22 +237,23 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             else:
                 launch_game(game_executable, save_slot, profile_info_path)
         else:
-            local_save_time = None
-            cloud_save_time = None
+            local_file_time = datetime(1900, 1, 1)
+            cloud_file_time = datetime(1900, 1, 1)
+
             for dirpath, dirnames, filenames in os.walk(local_save_folder):
                 for filename in filenames:
-                    local_file = os.path.join(dirpath, filename)
-                    cloud_file = os.path.join(game_profile_folder_save_slot, os.path.relpath(local_file, local_save_folder))
-                    if os.path.exists(cloud_file):
-                        local_file_time = datetime.datetime.fromtimestamp(os.path.getmtime(local_file))
-                        cloud_file_time = datetime.datetime.fromtimestamp(os.path.getmtime(cloud_file))
-                        if not local_save_time or local_file_time > local_save_time:
-                            local_save_time = local_file_time
-                        if not cloud_save_time or cloud_file_time > cloud_save_time:
-                            cloud_save_time = cloud_file_time
+                    file_time = datetime.fromtimestamp(os.path.getmtime(os.path.join(dirpath, filename)))
+                    if local_file_time < file_time:
+                        local_file_time = file_time
+                           
+            for dirpath, dirnames, filenames in os.walk(game_profile_folder_save_slot):
+                for filename in filenames:
+                    file_time = datetime.fromtimestamp(os.path.getmtime(os.path.join(dirpath, filename)))
+                    if cloud_file_time < file_time:
+                        cloud_file_time = file_time
 
-            local_save_time_str = local_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
-            cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
+            local_save_time_str = local_file_time.strftime("%B %d, %Y, %I:%M:%S %p")
+            cloud_save_time_str = cloud_file_time.strftime("%B %d, %Y, %I:%M:%S %p")
 
             sync_diag = uic.loadUi("sync_diag.ui")
             sync_diag.local_date.setText(local_save_time_str)
@@ -260,8 +264,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             game_name = config_profiles.get(profile_id, 'name')
 
             sync_diag.setWindowTitle(game_name)
-
-            if cloud_save_time > local_save_time:
+            if cloud_file_time > local_file_time:
                 sync_diag.local_indication.setText("Older")
                 sync_diag.cloud_indication.setText("Newer")
             else:

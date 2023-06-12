@@ -286,7 +286,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             
             sync_diag.exec_()
     else:
-        launch_game(game_executable, save_slot)
+        launch_game(game_executable, save_slot, profile_info_path)
 
 
 # Function to sync saves (Copy local saves to cloud storage)

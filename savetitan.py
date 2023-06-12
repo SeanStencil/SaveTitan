@@ -1529,6 +1529,7 @@ def show_config_dialog(config):
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
+        copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)
         
@@ -1539,6 +1540,7 @@ def show_config_dialog(config):
             open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
             delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
             open_save_mgmt_action.triggered.connect(lambda: save_mgmt_dialog(selected_profile_id))
+            copy_profile_id_action.triggered.connect(lambda: QApplication.clipboard().setText(selected_profile_id))
 
             menu.addAction(open_local_save_action)
             menu.addAction(open_cloud_storage_action)
@@ -1546,9 +1548,10 @@ def show_config_dialog(config):
             menu.addAction(open_save_mgmt_action)
             menu.addSeparator()
             menu.addAction(delete_profile_action)
+            menu.addSeparator()
+            menu.addAction(copy_profile_id_action)  # Add to the context menu
 
             menu.exec_(configprofileView.viewport().mapToGlobal(point))
-
 
     configprofileView.setContextMenuPolicy(Qt.CustomContextMenu)
     configprofileView.customContextMenuRequested.connect(context_menu)

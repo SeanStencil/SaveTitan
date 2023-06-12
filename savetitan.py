@@ -182,7 +182,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                         break
             if not files_identical:
                 break
-        
+
         if files_identical:
             local_files_count = len(os.listdir(local_save_folder))
             cloud_files_count = len(os.listdir(game_profile_folder_save_slot))
@@ -213,6 +213,8 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
 
             sync_diag = uic.loadUi("sync_diag.ui")
+            sync_diag.local_date.setText(cloud_save_time_str)
+            sync_diag.cloud_date.setText(local_save_time_str)
 
             config_profiles = configparser.ConfigParser()
             config_profiles.read('profiles.ini')
@@ -220,12 +222,12 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 
             sync_diag.setWindowTitle(game_name)
 
-            if local_save_time > cloud_save_time:
-                sync_diag.local_indication.setText("Older")
-                sync_diag.cloud_indication.setText("Newer")
-            else:
+            if cloud_save_time > local_save_time:
                 sync_diag.local_indication.setText("Newer")
                 sync_diag.cloud_indication.setText("Older")
+            else:
+                sync_diag.local_indication.setText("Older")
+                sync_diag.cloud_indication.setText("Newer")
 
             sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), launch_game(game_executable, save_slot), sync_diag.accept()])
             sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot), sync_diag.accept()])
@@ -236,6 +238,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             sync_diag.exec_()
     else:
         launch_game(game_executable, save_slot)
+
 
 
 # Function to sync saves (Copy local saves to cloud storage)

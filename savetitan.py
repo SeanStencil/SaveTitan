@@ -171,9 +171,6 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
     cloud_storage_path = config.get("Global Settings", "cloud_storage_path")
     game_profile_folder_save_slot = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
     if os.path.exists(game_profile_folder_save_slot) and os.listdir(game_profile_folder_save_slot):
-        local_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(local_save_folder))
-        cloud_save_time = datetime.datetime.fromtimestamp(os.path.getmtime(game_profile_folder_save_slot))
-
         files_identical = True
         for dirpath, dirnames, filenames in os.walk(local_save_folder):
             for filename in filenames:
@@ -185,7 +182,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                         break
             if not files_identical:
                 break
-
+        
         if files_identical:
             local_files_count = len(os.listdir(local_save_folder))
             cloud_files_count = len(os.listdir(game_profile_folder_save_slot))
@@ -198,6 +195,20 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             else:
                 launch_game(game_executable, save_slot)
         else:
+            local_save_time = None
+            cloud_save_time = None
+            for dirpath, dirnames, filenames in os.walk(local_save_folder):
+                for filename in filenames:
+                    local_file = os.path.join(dirpath, filename)
+                    cloud_file = os.path.join(game_profile_folder_save_slot, os.path.relpath(local_file, local_save_folder))
+                    if os.path.exists(cloud_file):
+                        local_file_time = datetime.datetime.fromtimestamp(os.path.getmtime(local_file))
+                        cloud_file_time = datetime.datetime.fromtimestamp(os.path.getmtime(cloud_file))
+                        if not local_save_time or local_file_time > local_save_time:
+                            local_save_time = local_file_time
+                        if not cloud_save_time or cloud_file_time > cloud_save_time:
+                            cloud_save_time = cloud_file_time
+
             local_save_time_str = local_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
             cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
 

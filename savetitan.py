@@ -213,8 +213,8 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             cloud_save_time_str = cloud_save_time.strftime("%B %d, %Y, %I:%M:%S %p")
 
             sync_diag = uic.loadUi("sync_diag.ui")
-            sync_diag.local_date.setText(cloud_save_time_str)
-            sync_diag.cloud_date.setText(local_save_time_str)
+            sync_diag.local_date.setText(local_save_time_str)
+            sync_diag.cloud_date.setText(cloud_save_time_str)
 
             config_profiles = configparser.ConfigParser()
             config_profiles.read('profiles.ini')

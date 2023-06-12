@@ -132,7 +132,6 @@ def clear_checkout_field(profile_id, profile_info_path):
     config = configparser.ConfigParser()
     config.read(profile_info_path)
     
-    print(profile_info_path)
     config.set(profile_id, "checkout", "")
     with open(profile_info_path, "w") as file:
         config.write(file)

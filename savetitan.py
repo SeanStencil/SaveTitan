@@ -140,7 +140,6 @@ def clear_checkout_field(profile_id, profile_info_path):
 # Perform backup function prior to sync
 def make_backup_copy(original_folder):
     backup_folder = original_folder + ".bak"
-
     while True:
         try:
             if os.path.exists(backup_folder):
@@ -711,7 +710,6 @@ def show_config_dialog(config):
             with open(profile_info_file_path, "w") as file:
                 profile_info_config.write(file)
 
-            # Set the new save name to be "Save" plus the save slot number
             new_save_name = f"Save {number_of_saves}"
             profile_info_config.set('saves', f'save{number_of_saves}', new_save_name)
                 
@@ -754,7 +752,6 @@ def show_config_dialog(config):
             with open(profiles_config_file, "w") as file:
                 config.write(file)
 
-            # Update save_slot in profile_info.savetitan
             profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
             profile_info_config = configparser.ConfigParser()
             profile_info_config.read(profile_info_file_path)

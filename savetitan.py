@@ -1,5 +1,3 @@
-#!/bin/python3
-
 import os
 import shutil
 import filecmp
@@ -14,6 +12,7 @@ import sys
 import glob
 import stat
 import logging
+import socket
 
 
 from PyQt5 import QtWidgets, uic, QtCore
@@ -96,7 +95,6 @@ def network_share_accessible():
 def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name):
     global cloud_storage_path
 
-
     if not network_share_accessible():
         QMessageBox.critical(None, "Add Profile Aborted",
                              "The network location is not accessible, the process to add the profile has been aborted.")
@@ -112,7 +110,8 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
         "save_slot": str(save_slot),
         "saves": str(saves),
         "sync_mode": sync_mode,
-        "executable_name": executable_name
+        "executable_name": executable_name,
+        "checkout": ""
     }
 
     config["saves"] = {
@@ -127,6 +126,16 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
     except Exception as e:
         QMessageBox.critical(None, "Add Profile Aborted",
                              f"Error exporting profile info: {str(e)}. The process to add the profile has been aborted.")
+
+
+def clear_checkout_field(profile_id, profile_info_path):
+    config = configparser.ConfigParser()
+    config.read(profile_info_path)
+    
+    print(profile_info_path)
+    config.set(profile_id, "checkout", "")
+    with open(profile_info_path, "w") as file:
+        config.write(file)
 
 
 # Perform backup function prior to sync
@@ -169,6 +178,38 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
     config = configparser.ConfigParser()
     config.read(global_config_file)
     cloud_storage_path = config.get("Global Settings", "cloud_storage_path")
+    profile_info_path = os.path.join(cloud_storage_path, profile_id)
+    profile_info_path = os.path.join(profile_info_path, "profile_info.savetitan")
+    config = configparser.ConfigParser()
+    config.read(profile_info_path)
+
+    checkout_user = config.get(profile_id, "checkout", fallback="")
+    current_user = socket.gethostname()
+    if checkout_user and checkout_user != current_user:
+        checkout_msgbox = QMessageBox()
+        checkout_msgbox.setWindowTitle("Checkout Warning")
+        checkout_msgbox.setText(
+            f"Someone started playing from \"{checkout_user}\" and hasn't synced yet. (This can happen if the other computer didn't close SaveTitan through normal operation)\n\n"
+            f""
+            f"Do you want to continue?"
+        )
+        yes_button = checkout_msgbox.addButton(QMessageBox.Yes)
+        no_button = checkout_msgbox.addButton(QMessageBox.No)
+        checkout_msgbox.setDefaultButton(no_button)
+        result = checkout_msgbox.exec_()
+
+        if result == -1 or checkout_msgbox.clickedButton() == no_button:
+            sys.exit()
+        elif checkout_msgbox.clickedButton() == yes_button:
+            config.set(profile_id, "checkout", current_user)
+            with open(profile_info_path, "w") as file:
+                config.write(file)
+
+    elif not checkout_user:
+        config.set(profile_id, "checkout", current_user)
+        with open(profile_info_path, "w") as file:
+            config.write(file)
+
     game_profile_folder_save_slot = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
     if os.path.exists(game_profile_folder_save_slot) and os.listdir(game_profile_folder_save_slot):
         files_identical = True
@@ -188,12 +229,12 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             cloud_files_count = len(os.listdir(game_profile_folder_save_slot))
             
             if local_files_count > cloud_files_count:
-                launch_game(game_executable, save_slot)
+                launch_game(game_executable, save_slot, profile_info_path)
             elif cloud_files_count > local_files_count:
                 sync_save_local(game_profile_folder_save_slot, local_save_folder)
-                launch_game(game_executable, save_slot)
+                launch_game(game_executable, save_slot, profile_info_path)
             else:
-                launch_game(game_executable, save_slot)
+                launch_game(game_executable, save_slot, profile_info_path)
         else:
             local_save_time = None
             cloud_save_time = None
@@ -218,7 +259,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 
             config_profiles = configparser.ConfigParser()
             config_profiles.read('profiles.ini')
-            game_name = config_profiles.get(profile_id, 'name')  # Assumes the 'name' field in the profile_id section contains the game's name
+            game_name = config_profiles.get(profile_id, 'name')
 
             sync_diag.setWindowTitle(game_name)
 
@@ -229,20 +270,28 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                 sync_diag.local_indication.setText("Newer")
                 sync_diag.cloud_indication.setText("Older")
 
-            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), launch_game(game_executable, save_slot), sync_diag.accept()])
-            sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot), sync_diag.accept()])
-            sync_diag.nosyncButton.clicked.connect(lambda: [launch_game_without_sync(game_executable), sync_diag.accept()])
+            def on_nosyncButton_clicked():
+                launch_game_without_sync(game_executable)
+                clear_checkout_field(profile_id, profile_info_path)
+                sync_diag.accept()
+            
+            def on_rejected_connect():
+                clear_checkout_field(profile_id, profile_info_path)
+                sys.exit()
 
-            sync_diag.rejected.connect(lambda: sys.exit())
+            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), launch_game(game_executable, save_slot, profile_info_path), sync_diag.accept()])
+            sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot, profile_info_path), sync_diag.accept()])
+            sync_diag.nosyncButton.clicked.connect(lambda: [on_nosyncButton_clicked()])
+
+            sync_diag.rejected.connect(lambda: on_rejected_connect())
             
             sync_diag.exec_()
     else:
         launch_game(game_executable, save_slot)
 
 
-
 # Function to sync saves (Copy local saves to cloud storage)
-def sync_save_cloud(game_profile, save_slot): 
+def sync_save_cloud(game_profile, save_slot, profile_info_path): 
     save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
     if not network_share_accessible():
         return
@@ -272,7 +321,7 @@ def sync_save_cloud(game_profile, save_slot):
                 break
 
 
-def sync_save_cloud_workaround(source_folder, destination_folder):
+def sync_save_cloud_workaround(source_folder, destination_folder, profile_info_path):
     if not network_share_accessible():
         return
     while True:
@@ -330,10 +379,10 @@ def sync_save_local(source_folder, destination_folder):
 
 
 # Function to launch the game
-def launch_game(game_executable, save_slot):
+def launch_game(game_executable, save_slot, profile_info_path):
     if not check_execute_permissions(game_executable, 'game executable'):
         return
-
+    
     subprocess.Popen(game_executable)
 
     def handle_dialog_response():
@@ -347,7 +396,9 @@ def launch_game(game_executable, save_slot):
         message_box.exec_()
 
         if message_box.clickedButton() == done_button:
-            sync_save_cloud(args.runprofile, save_slot)
+            sync_save_cloud(args.runprofile, save_slot, profile_info_path)
+
+        clear_checkout_field(profile_id, profile_info_path)
 
     QTimer.singleShot(0, handle_dialog_response)
 

@@ -224,7 +224,7 @@ def make_backup_copy(original_folder):
                 break
 
 
-# REFACTORED: Function to check and sync saves
+# REFACTORED FUNCTION: Function to check and sync saves
 def check_and_sync_saves(profile_id):
 
     #Load data set
@@ -384,7 +384,7 @@ def launch_game(profile_id):
     QTimer.singleShot(0, launch_game_dialog)
 
 
-# REFACTORED: Parse command-line arguments
+# REFACTORED FUNCTION: Parse command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-runid", help="Specify the profile ID to be used")
 args = parser.parse_args()

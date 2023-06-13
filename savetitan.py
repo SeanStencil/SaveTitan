@@ -232,7 +232,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
             if local_files_count > cloud_files_count:
                 launch_game(game_executable, save_slot, profile_info_path)
             elif cloud_files_count > local_files_count:
-                sync_save_local(game_profile_folder_save_slot, local_save_folder)
+                sync_save_local(game_profile_folder_save_slot, local_save_folder, game_profile_folder_save_slot)
                 launch_game(game_executable, save_slot, profile_info_path)
             else:
                 launch_game(game_executable, save_slot, profile_info_path)
@@ -265,11 +265,11 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
 
             sync_diag.setWindowTitle(game_name)
             if cloud_file_time > local_file_time:
-                sync_diag.local_indication.setText("Older")
-                sync_diag.cloud_indication.setText("Newer")
+                sync_diag.local_indication.setText("Local Copy: Older")
+                sync_diag.cloud_indication.setText("Cloud Copy: Newer")
             else:
-                sync_diag.local_indication.setText("Newer")
-                sync_diag.cloud_indication.setText("Older")
+                sync_diag.local_indication.setText("Local Copy: Newer")
+                sync_diag.cloud_indication.setText("Cloud Copy: Older")
 
             def on_nosyncButton_clicked():
                 launch_game_without_sync(game_executable)
@@ -280,7 +280,7 @@ def check_and_sync_saves(name, local_save_folder, game_executable, save_slot, pr
                 clear_checkout_field(profile_id, profile_info_path)
                 sys.exit()
 
-            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder), launch_game(game_executable, save_slot, profile_info_path), sync_diag.accept()])
+            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(game_profile_folder_save_slot, local_save_folder,  game_profile_folder_save_slot), launch_game(game_executable, save_slot, profile_info_path), sync_diag.accept()])
             sync_diag.uploadButton.clicked.connect(lambda: [launch_game(game_executable, save_slot, profile_info_path), sync_diag.accept()])
             sync_diag.nosyncButton.clicked.connect(lambda: [on_nosyncButton_clicked()])
 
@@ -351,14 +351,14 @@ def sync_save_cloud_workaround(source_folder, destination_folder):
 
 
 # Function to sync saves (Copy cloud saves to local storage)
-def sync_save_local(source_folder, destination_folder):
+def sync_save_local(source_folder, destination_folder, save_slot_path):
     if not network_share_accessible():
         return
     while True:
         try:
             os.makedirs(destination_folder, exist_ok=True)
 
-            make_backup_copy(destination_folder)
+            make_backup_copy(save_slot_path)
 
             shutil.rmtree(destination_folder)
             shutil.copytree(source_folder, destination_folder)
@@ -765,7 +765,7 @@ def show_config_dialog(config):
             save_mgmt_dialog.saveslotField.setText(selected_item.text())
 
             new_cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, selected_save_key)
-            sync_save_local(new_cloud_save_folder, local_save_folder)
+            sync_save_local(new_cloud_save_folder, local_save_folder, new_cloud_save_folder)
 
             QMessageBox.information(None, "Load Finished", "The selected save has been loaded successfully.")
 

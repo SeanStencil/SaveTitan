@@ -127,23 +127,25 @@ def io_savetitan_file(global_config_file, read_write_mode, profile_id, field, wr
 
 
 # Function to sync saves (Copy local saves to cloud storage)
-def sync_save_cloud(profile_id): 
-    save_folder = os.path.join(game_profile_folder + "/save" + save_slot)
+def sync_save_cloud(profile_id):
+    cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
+    save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
+    cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
     if not network_share_accessible():
         return
     while True:
         try:
-            os.makedirs(save_folder, exist_ok=True)
+            os.makedirs(cloud_profile_save_path, exist_ok=True)
             
-            make_backup_copy(save_folder)
+            make_backup_copy(cloud_profile_save_path)
             
-            shutil.rmtree(save_folder)
-            shutil.copytree(local_save_folder, save_folder)
+            shutil.rmtree(cloud_profile_save_path)
+            shutil.copytree(local_save_folder, cloud_profile_save_path)
             
-            comparison = filecmp.dircmp(local_save_folder, save_folder)
+            comparison = filecmp.dircmp(local_save_folder, cloud_profile_save_path)
 
             if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-                match, mismatch, errors = filecmp.cmpfiles(local_save_folder, save_folder, comparison.common_files)
+                match, mismatch, errors = filecmp.cmpfiles(local_save_folder, cloud_profile_save_path, comparison.common_files)
                 if len(mismatch) == 0 and len(errors) == 0:
                     print("Sync completed successfully.")
                     break
@@ -364,7 +366,7 @@ def launch_game(profile_id):
 
     subprocess.Popen(game_executable)
 
-    def handle_dialog_response():
+    def launch_game_dialog():
         message_box = QMessageBox()
         message_box.setWindowTitle("Game in Progress")
         message_box.setText("Please click 'Upload to Cloud' when you have finished playing.")
@@ -379,7 +381,7 @@ def launch_game(profile_id):
 
         io_savetitan_file(profile_info_savetitan_path, "write", profile_id, "checkout", None)
 
-    QTimer.singleShot(0, handle_dialog_response)
+    QTimer.singleShot(0, launch_game_dialog)
 
 
 # REFACTORED: Parse command-line arguments

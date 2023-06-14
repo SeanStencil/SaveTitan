@@ -146,35 +146,35 @@
     </rect>
    </property>
    <property name="title">
-    <string>Mode</string>
+    <string>Cloud Sync</string>
    </property>
    <widget class="QRadioButton" name="backupRadio">
     <property name="enabled">
-     <bool>false</bool>
+     <bool>true</bool>
     </property>
     <property name="geometry">
      <rect>
-      <x>70</x>
+      <x>83</x>
       <y>20</y>
-      <width>111</width>
+      <width>91</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Backup Only</string>
+     <string>Disabled</string>
     </property>
    </widget>
    <widget class="QRadioButton" name="syncRadio">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>13</x>
       <y>20</y>
       <width>61</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Sync</string>
+     <string>Enabled</string>
     </property>
     <property name="checked">
      <bool>true</bool>

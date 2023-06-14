@@ -149,14 +149,20 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
 
 
 # Updated io_savetitan_file function
-def io_savetitan_file(read_write_mode, profile_id, section, field=None, write_value=None):
+def io_savetitan_file(read_write_mode, profile_id, section, field, write_value=None):
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
     profile_info_path = os.path.join(cloud_storage_path, f"{profile_id}", "profile_info.savetitan")
     if not check_permissions(profile_info_path, 'file', 'read'):
         raise PermissionError(f"Permission denied to read the profile file at {profile_info_path}")
 
+    if section == None:
+        section = profile_id
+
     config = configparser.ConfigParser()
     config.read(profile_info_path)
+
+    if not config.has_section(section):
+        config.add_section(section)
 
     if read_write_mode == "read":
         return config.get(section, field) if config.has_option(section, field) else None
@@ -347,6 +353,10 @@ def check_and_sync_saves(profile_id):
     sync_mode = profile_fields.get("sync_mode")
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
     profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
+
+    if sync_mode != "Sync":
+        launch_game_without_sync(game_executable)
+        return
 
     # Check: Checkout Hostname
     checkout_previous_user = io_savetitan_file("read", profile_id, None, "checkout")
@@ -699,8 +709,6 @@ def show_config_dialog():
         save_mgmt_dialog.setWindowFlags(save_mgmt_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         save_mgmt_dialog.setFixedSize(save_mgmt_dialog.size())
 
-        #checkout_previous_user = io_savetitan_file("read", profile_id, None, "checkout")
-
         profile_info_config = configparser.ConfigParser()
         profile_folder = os.path.join(cloud_storage_path, profile_id)
         profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
@@ -764,7 +772,6 @@ def show_config_dialog():
                 return
 
             local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
-
             cloud_save_folder = os.path.join(cloud_storage_path, profile_id, f"save{current_save_slot}")
 
             reply = QMessageBox.question(None, "Upload current save?",
@@ -777,8 +784,6 @@ def show_config_dialog():
             new_save_slot = selected_save_key.replace('save', '')
             
             io_config_file("profiles_file", "write", profile_id, "save_slot", new_save_slot)
-            
-            io_savetitan_file("write", profile_id, None, "save_slot", new_save_slot)
 
             save_mgmt_dialog.saveslotField.setText(selected_item.text())
 
@@ -1513,6 +1518,8 @@ def show_config_dialog():
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
+        open_save_editor_action = QAction("Open Save Editor", menu)
+        open_save_editor_action.setEnabled(False)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)
@@ -1530,6 +1537,7 @@ def show_config_dialog():
             menu.addAction(open_cloud_storage_action)
             menu.addSeparator()
             menu.addAction(open_save_mgmt_action)
+            menu.addAction(open_save_editor_action)
             menu.addSeparator()
             menu.addAction(delete_profile_action)
             menu.addSeparator()
@@ -1579,24 +1587,9 @@ elif args.runprofile:
     if not profile_id:
         print("The specified game profile does not exist in profiles.ini")
         sys.exit(1)
-    else:
-        profile_data = io_config_file("profiles_file", "read", profile_id)
-        if not profile_data or profile_id not in profile_data:
-            sys.exit(1)
-        
-        profile_fields = profile_data[profile_id]
-        name = profile_fields.get("name")
-        local_save_folder = profile_fields.get("local_save_folder")
-        game_executable = profile_fields.get("game_executable")
-        save_slot = profile_fields.get("save_slot")
-        sync_mode = profile_fields.get("sync_mode")
-
-        if not cloud_storage_path:
-            print("Cloud storage path is not configured. Run the script without a parameter to run the first-time setup")
-            sys.exit(1)
-
-        game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
-        check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
+    
+    check_and_sync_saves(profile_id)
+    
 elif args.runid:
     if not cloud_storage_path:
         print("Cloud storage path is not configured. Run the script without a parameter to run the first-time setup")

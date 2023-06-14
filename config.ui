@@ -33,7 +33,7 @@
      </rect>
     </property>
     <property name="title">
-     <string>Edit Profile</string>
+     <string>Cloud Sync</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -185,33 +185,33 @@
      <property name="title">
       <string>Mode</string>
      </property>
-     <widget class="QRadioButton" name="backupRadio">
+     <widget class="QRadioButton" name="syncdisableRadio">
       <property name="enabled">
-       <bool>false</bool>
+       <bool>true</bool>
       </property>
       <property name="geometry">
        <rect>
-        <x>70</x>
+        <x>86</x>
         <y>20</y>
-        <width>111</width>
+        <width>91</width>
         <height>16</height>
        </rect>
       </property>
       <property name="text">
-       <string>Backup Only</string>
+       <string>Disabled</string>
       </property>
      </widget>
-     <widget class="QRadioButton" name="syncRadio">
+     <widget class="QRadioButton" name="syncenableRadio">
       <property name="geometry">
        <rect>
-        <x>10</x>
+        <x>13</x>
         <y>20</y>
-        <width>61</width>
+        <width>81</width>
         <height>16</height>
        </rect>
       </property>
       <property name="text">
-       <string>Sync</string>
+       <string>Enabled</string>
       </property>
       <property name="checked">
        <bool>true</bool>
@@ -343,7 +343,7 @@
      <x>0</x>
      <y>0</y>
      <width>671</width>
-     <height>22</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

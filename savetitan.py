@@ -22,11 +22,11 @@ from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
 
-# REFACTORED FUNCTION (DONE): Get the script's directory
+# Get the script's directory
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-# REFACTORED FUNCTION (DONE): Define the config file path
+# Define the config file path
 profiles_config_file = os.path.join(script_dir, "profiles.ini")
 global_config_file = os.path.join(script_dir, "global.ini")
 
@@ -39,7 +39,7 @@ def generate_id():
     return random_id
 
 
-# REFACTORED FUNCTION (DONE): Check a function's ability to perform the given action (read, write, execute) on the file/folder path
+# Check a function's ability to perform the given action (read, write, execute) on the file/folder path
 def check_permissions(path, file_type, action):
     actions = {
         "read": os.R_OK,
@@ -57,7 +57,7 @@ def check_permissions(path, file_type, action):
     return True
 
 
-# REFACTORED FUNCTION (DONE): Try and wake up the network location
+# Try and wake up the network location
 def network_share_accessible():
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
 
@@ -75,7 +75,7 @@ def network_share_accessible():
         return False
         
 
-# REFACTORED FUNCTION: Function to read and write the profiles.ini and global.ini files
+# Function to read and write the profiles.ini and global.ini files
 def io_config_file(config_type, read_write_mode, profile_id=None, field=None, write_value=None):
     config = configparser.ConfigParser()
     if config_type == "profiles_file":
@@ -87,13 +87,15 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
     else:
         raise ValueError("Invalid config_type. Expected 'profiles_file' or 'global_file'.")
 
+    if not os.path.exists(config_file):
+        open(config_file, 'a').close()
+
     if not check_permissions(config_file, config_type, "read"):
         raise PermissionError(f"Permission denied to read the {config_type}.")
 
     config.read(config_file)
 
     if config_type == "profiles_file" and read_write_mode == "read" and profile_id and not config.has_section(profile_id):
-            print("No section found for provided profile_id, returning None")
             return None
 
     if read_write_mode == "read":
@@ -146,8 +148,8 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
         raise ValueError("Invalid read_write_mode. Expected 'read', 'write', or 'delete'.")
 
 
-# REFACTORED FUNCTION (DONE): Function to read and write the profile_info.savetitan file in the cloud storage location
-def io_savetitan_file(read_write_mode, profile_id, field, write_value=None):
+# Updated io_savetitan_file function
+def io_savetitan_file(read_write_mode, profile_id, section, field=None, write_value=None):
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
     profile_info_path = os.path.join(cloud_storage_path, f"{profile_id}", "profile_info.savetitan")
     if not check_permissions(profile_info_path, 'file', 'read'):
@@ -157,20 +159,28 @@ def io_savetitan_file(read_write_mode, profile_id, field, write_value=None):
     config.read(profile_info_path)
 
     if read_write_mode == "read":
-        return config.get(profile_id, field) if config.has_option(profile_id, field) else None
+        return config.get(section, field) if config.has_option(section, field) else None
     elif read_write_mode == "write":
         if not field:
             raise ValueError("Field must be specified in 'write' mode.")
         if not check_permissions(profile_info_path, 'file', 'write'):
             raise PermissionError(f"Permission denied to write to the profile file at {profile_info_path}")
-        config.set(profile_id, field, write_value or "")
+        config.set(section, field, write_value or "")
+        with open(profile_info_path, "w") as file:
+            config.write(file)
+    elif read_write_mode == "delete":
+        if not field:
+            raise ValueError("Field must be specified in 'delete' mode.")
+        if not check_permissions(profile_info_path, 'file', 'write'):
+            raise PermissionError(f"Permission denied to delete from the profile file at {profile_info_path}")
+        config.remove_option(section, field)
         with open(profile_info_path, "w") as file:
             config.write(file)
     else:
-        raise ValueError("Invalid read_write_mode. Expected 'read' or 'write'.")
+        raise ValueError("Invalid read_write_mode. Expected 'read', 'write', or 'delete'.")
 
 
-# REFACTORED FUNCTION (DONE): Checks for file mismatch
+# Checks for file mismatch
 def check_folder_mismatch(folder_a, folder_b):
     comparison = filecmp.dircmp(folder_a, folder_b)
 
@@ -191,7 +201,7 @@ def check_folder_mismatch(folder_a, folder_b):
     return compare_dirs(comparison)
 
 
-# REFACTORED FUNCTION (DONE): Function to sync saves (Copy local saves to cloud storage)
+# Function to sync saves (Copy local saves to cloud storage)
 def sync_save_cloud(profile_id):
     local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
@@ -224,7 +234,7 @@ def sync_save_cloud(profile_id):
                 break
 
 
-# REFACTORED FUNCTION (DONE): Function to sync saves (Copy cloud saves to local storage)
+# Function to sync saves (Copy cloud saves to local storage)
 def sync_save_local(profile_id):
     local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
@@ -256,7 +266,7 @@ def sync_save_local(profile_id):
                 break
 
 
-# REFACTORED FUNCTION (DONE): Perform backup function prior to sync
+# Perform backup function prior to sync
 def make_backup_copy(profile_id, which_side):
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
     save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
@@ -283,7 +293,6 @@ def make_backup_copy(profile_id, which_side):
         shutil.copytree(cloud_profile_folder_save, cloud_profile_folder_save_bak)
 
 
-# Export a .savetitan file for the profile folder in cloud storage
 def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name):
     global cloud_storage_path
 
@@ -294,6 +303,9 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
 
     folder_path = os.path.join(cloud_storage_path, profile_id)
     os.makedirs(folder_path, exist_ok=True)
+
+    save1_folder_path = os.path.join(folder_path, 'save1')
+    os.makedirs(save1_folder_path, exist_ok=True)
 
     file_path = os.path.join(folder_path, "profile_info.savetitan")
     config = configparser.ConfigParser()
@@ -320,7 +332,7 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
                              f"Error exporting profile info: {str(e)}. The process to add the profile has been aborted.")
 
 
-# REFACTORED FUNCTION (DONE): Function to check and sync saves
+# Function to check and sync saves
 def check_and_sync_saves(profile_id):
 
     #Load data set
@@ -337,7 +349,7 @@ def check_and_sync_saves(profile_id):
     profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
 
     # Check: Checkout Hostname
-    checkout_previous_user = io_savetitan_file("read", profile_id, "checkout")
+    checkout_previous_user = io_savetitan_file("read", profile_id, None, "checkout")
     checkout_current_user = socket.gethostname()
     if checkout_previous_user and checkout_previous_user != checkout_current_user:
         checkout_msgbox = QMessageBox()
@@ -355,10 +367,10 @@ def check_and_sync_saves(profile_id):
         if result == -1 or checkout_msgbox.clickedButton() == no_button:
             sys.exit()
         elif checkout_msgbox.clickedButton() == yes_button:
-            io_savetitan_file("write", profile_id, "checkout", checkout_current_user)
+            io_savetitan_file("write", profile_id, None, "checkout", checkout_current_user)
 
     elif not checkout_previous_user:
-        io_savetitan_file("write", profile_id, "checkout", checkout_current_user)
+        io_savetitan_file("write", profile_id, None, "checkout", checkout_current_user)
 
     # Check: If files with the same name are identical
     if os.path.exists(cloud_profile_save_path) and os.listdir(cloud_profile_save_path):
@@ -434,11 +446,11 @@ def check_and_sync_saves(profile_id):
 
             def on_nosyncButton_clicked():
                 launch_game_without_sync(profile_id)
-                io_savetitan_file("write", profile_id, "checkout", None)
+                io_savetitan_file("write", profile_id, None, "checkout", None)
                 sync_diag.accept()
             
             def on_rejected_connect():
-                io_savetitan_file("write", profile_id, "checkout", None)
+                io_savetitan_file("write", profile_id, None, "checkout", None)
                 sys.exit()
 
             sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(profile_id), launch_game(profile_id), sync_diag.accept()])
@@ -452,7 +464,7 @@ def check_and_sync_saves(profile_id):
         launch_game(profile_id)
 
 
-# REFACTORED FUNCTION (DONE): Function to launch the game
+# Function to launch the game
 def launch_game(profile_id):
     game_executable = io_config_file("profiles_file", "read", profile_id, "game_executable")
     profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
@@ -475,12 +487,12 @@ def launch_game(profile_id):
         if message_box.clickedButton() == done_button:
             sync_save_cloud(profile_id)
 
-        io_savetitan_file("write", profile_id, "checkout", None)
+        io_savetitan_file("write", profile_id, None, "checkout")
 
     QTimer.singleShot(0, launch_game_dialog)
 
 
-# REFACTORED FUNCTION (DONE): Function to launch the game without sync
+# Function to launch the game without sync
 def launch_game_without_sync(game_executable):
     game_executable = io_config_file("profiles_file", "read", profile_id, "game_executable")
     profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
@@ -539,7 +551,7 @@ def set_cloud_storage_path():
     dialog.importButton.setEnabled(True)
 
 
-# REFACTORED FUNCTION: Calculate the center position over another dialog window
+# Calculate the center position over another dialog window
 def center_dialog_over_dialog(first_dialog, second_dialog):
     def move_second_dialog_to_center():
         first_dialog_size = first_dialog.size()
@@ -682,31 +694,27 @@ def show_config_dialog():
         
         
     # Function to open save management dialog
-    def save_mgmt_dialog(selected_profile_id):
+    def save_mgmt_dialog(profile_id):
         save_mgmt_dialog = uic.loadUi("save_mgmt.ui")
         save_mgmt_dialog.setWindowFlags(save_mgmt_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         save_mgmt_dialog.setFixedSize(save_mgmt_dialog.size())
 
-        config = configparser.ConfigParser()
-        config.read(profiles_config_file)
-        if selected_profile_id not in config.sections():
-            QMessageBox.warning(None, "Profile Not Found", "The selected profile does not exist.")
-            return
+        #checkout_previous_user = io_savetitan_file("read", profile_id, None, "checkout")
 
         profile_info_config = configparser.ConfigParser()
-        profile_folder = os.path.join(cloud_storage_path, selected_profile_id)
+        profile_folder = os.path.join(cloud_storage_path, profile_id)
         profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
 
         profile_info_config.read(profile_info_file_path)
 
-        save_mgmt_dialog.profilenameField.setText(profile_info_config.get(selected_profile_id, 'name'))
-        save_mgmt_dialog.saveField.setText(config.get(selected_profile_id, 'local_save_folder'))
+        save_mgmt_dialog.profilenameField.setText(io_savetitan_file("read", profile_id, None, "name"))
+        save_mgmt_dialog.saveField.setText(io_config_file("profiles_file", "read", profile_id, "local_save_folder"))
 
-        save_slot = config.get(selected_profile_id, 'save_slot')
+        save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
         save_slot_key = f"save{save_slot}"
 
         if 'saves' in profile_info_config.sections() and save_slot_key in profile_info_config['saves']:
-            save_mgmt_dialog.saveslotField.setText(profile_info_config.get('saves', save_slot_key))
+            save_mgmt_dialog.saveslotField.setText(io_savetitan_file("read", profile_id, "saves", save_slot_key))
 
         center_dialog_over_dialog(QApplication.activeWindow(), save_mgmt_dialog)
 
@@ -728,19 +736,13 @@ def show_config_dialog():
             if confirm_ret == QMessageBox.No:
                 return
 
-            number_of_saves = int(profile_info_config.get(selected_profile_id, "saves", fallback="0")) + 1
-            profile_info_config.set(selected_profile_id, "saves", str(number_of_saves))
-
-            with open(profile_info_file_path, "w") as file:
-                profile_info_config.write(file)
+            number_of_saves = int(io_savetitan_file("read", profile_id, None, "saves")) + 1
+            io_savetitan_file("write", profile_id, None, "saves", str(number_of_saves))  # convert number_of_saves to string
 
             new_save_name = f"Save {number_of_saves}"
-            profile_info_config.set('saves', f'save{number_of_saves}', new_save_name)
-                
-            with open(profile_info_file_path, "w") as file:
-                profile_info_config.write(file)
+            io_savetitan_file("write", profile_id, "saves", f'save{number_of_saves}', new_save_name)
 
-            new_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f'save{number_of_saves}')
+            new_save_folder = os.path.join(cloud_storage_path, profile_id, f'save{number_of_saves}')
             os.makedirs(new_save_folder, exist_ok=True)
 
             item = QListWidgetItem(new_save_name)
@@ -756,37 +758,31 @@ def show_config_dialog():
             selected_item = selected_items[0]
             selected_save_key = selected_item.data(Qt.UserRole)
 
-            if selected_save_key == f"save{config.get(selected_profile_id, 'save_slot')}":
+            current_save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
+            
+            if selected_save_key == f"save{current_save_slot}":
                 return
 
-            current_save_slot = config.get(selected_profile_id, 'save_slot')
-            local_save_folder = config.get(selected_profile_id, 'local_save_folder')
+            local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
 
-            cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, f"save{current_save_slot}")
+            cloud_save_folder = os.path.join(cloud_storage_path, profile_id, f"save{current_save_slot}")
 
             reply = QMessageBox.question(None, "Upload current save?",
-                                         "Do you want to upload your current save before switching? Your local save will be replaced with the selected one.",
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                                        "Do you want to upload your current save before switching? Your local save will be replaced with the selected one.",
+                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
 
             if reply == QMessageBox.Yes:
-                sync_save_cloud_workaround(local_save_folder, cloud_save_folder)
+                sync_save_cloud(profile_id)
 
             new_save_slot = selected_save_key.replace('save', '')
-            config.set(selected_profile_id, 'save_slot', new_save_slot)
-            with open(profiles_config_file, "w") as file:
-                config.write(file)
-
-            profile_info_file_path = os.path.join(cloud_storage_path, selected_profile_id, "profile_info.savetitan")
-            profile_info_config = configparser.ConfigParser()
-            profile_info_config.read(profile_info_file_path)
-            profile_info_config.set(selected_profile_id, 'save_slot', new_save_slot)
-            with open(profile_info_file_path, "w") as file:
-                profile_info_config.write(file)
+            
+            io_config_file("profiles_file", "write", profile_id, "save_slot", new_save_slot)
+            
+            io_savetitan_file("write", profile_id, None, "save_slot", new_save_slot)
 
             save_mgmt_dialog.saveslotField.setText(selected_item.text())
 
-            new_cloud_save_folder = os.path.join(cloud_storage_path, selected_profile_id, selected_save_key)
-            sync_save_local(new_cloud_save_folder, local_save_folder, new_cloud_save_folder)
+            sync_save_local(profile_id)
 
             QMessageBox.information(None, "Load Finished", "The selected save has been loaded successfully.")
 
@@ -809,12 +805,9 @@ def show_config_dialog():
             if confirm_ret == QMessageBox.No:
                 return
 
-            profile_info_config.remove_option('saves', selected_save_key)
+            io_savetitan_file("delete", profile_id, "saves", selected_save_key)
 
-            with open(profile_info_file_path, "w") as file:
-                profile_info_config.write(file)
-
-            shutil.rmtree(os.path.join(cloud_storage_path, selected_profile_id, selected_save_key))
+            shutil.rmtree(os.path.join(cloud_storage_path, profile_id, selected_save_key))
 
             list_item = save_mgmt_dialog.save_listWidget.takeItem(save_mgmt_dialog.save_listWidget.row(selected_item))
             del list_item
@@ -826,22 +819,20 @@ def show_config_dialog():
                 return
 
             selected_item = selected_items[0]
-            selected_save_field = selected_item.data(Qt.UserRole)
+            selected_save_key = selected_item.data(Qt.UserRole)
 
             new_save_name, ok = QInputDialog.getText(save_mgmt_dialog, "Rename Save", "Enter new save name:")
             if not ok or not new_save_name:
                 return
 
             # Check if the new save name already exists
-            existing_save_names = [profile_info_config.get('saves', key).lower() for key in profile_info_config.options('saves')]
+            existing_save_names = [io_savetitan_file("read", profile_id, "saves", key).lower() 
+                                   for key in profile_info_config.options('saves')]
             if new_save_name.lower() in existing_save_names:
                 QMessageBox.warning(None, "Name Already Exists", "A save with this name already exists. Please choose a different name.")
                 return
 
-            profile_info_config.set('saves', selected_save_field, new_save_name)
-
-            with open(profile_info_file_path, "w") as file:
-                profile_info_config.write(file)
+            io_savetitan_file("write", profile_id, "saves", selected_save_key, new_save_name)
 
             selected_item.setText(new_save_name)
 
@@ -1003,7 +994,7 @@ def show_config_dialog():
                 f.write(f"{subfolder}: {message}\n")
 
 
-        # REFACTORED FUNCTION: Scan the cloud storage location for importable profiles
+        # Scan the cloud storage location for importable profiles
         def scan_cloud_storage():
             scanned_count = 0
             added_count = 0
@@ -1522,7 +1513,6 @@ def show_config_dialog():
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
-        open_save_mgmt_action.setEnabled(False)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)
@@ -1559,7 +1549,7 @@ def show_config_dialog():
     dialog.show()
 
 
-# REFACTORED FUNCTION: Parse command-line arguments
+# Parse command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-runprofile", help="Specify the game profile to be used")
 parser.add_argument("-runid", help="Specify the profile ID to be used")

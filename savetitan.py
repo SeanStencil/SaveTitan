@@ -118,7 +118,10 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
         if not config.has_section(config_section):
             config.add_section(config_section)
 
-        config.set(config_section, field, write_value or "")
+        if write_value is None:
+            write_value = " "
+
+        config.set(config_section, field, write_value)
         with open(config_file, "w") as file:
             config.write(file)
 
@@ -580,6 +583,7 @@ def show_config_dialog():
         if not os.path.exists(cloud_storage_path):
             QMessageBox.warning(None, "Invalid Cloud Storage Path",
                                 "The current cloud storage location is invalid.")
+            io_config_file("global_file", "write", None, "cloud_storage_path")
             response = QMessageBox.question(None, "Set New Cloud Storage Path",
                                              "Would you like to set a new cloud storage path?", QMessageBox.Yes | QMessageBox.No)
             if response == QMessageBox.Yes:
@@ -1450,38 +1454,34 @@ def show_config_dialog():
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[2]
 
-        config = configparser.ConfigParser()
-        config.read(profiles_config_file)
-
-        if profile_id not in config.sections():
+        profile_data = io_config_file("profiles_file", "read", profile_id)
+        if profile_data is None:
             QMessageBox.warning(None, "Profile Not Found", "The selected profile does not exist.")
             return
 
         profile_name = dialog.profilenameField.text()
         local_save_folder = dialog.saveField.text()
         game_executable = dialog.executableField.text()
-        sync_mode = config.get(profile_id, "sync_mode", fallback="Sync")
+        sync_mode = profile_data.get("sync_mode", "Sync")
 
-        for section in config.sections():
-            if section != profile_id and config.get(section, 'name').lower() == profile_name.lower():
-                QMessageBox.critical(None, "Profile Already Exists", 
-                                     "A profile with the same name already exists. Please choose a different name.")
-                return
+        if profile_name.lower() in [io_config_file("profiles_file", "read", sec, "name").lower() for sec in io_config_file("profiles_file", "read") if sec != profile_id]:
+            QMessageBox.critical(None, "Profile Already Exists", 
+                                 "A profile with the same name already exists. Please choose a different name.")
+            return
 
-        config.set(profile_id, "name", profile_name)
-        config.set(profile_id, "local_save_folder", local_save_folder)
-        config.set(profile_id, "game_executable", game_executable)
-        config.set(profile_id, "sync_mode", sync_mode)
-        save_config_file(config)
+        io_config_file("profiles_file", "write", profile_id, "name", profile_name)
+        io_config_file("profiles_file", "write", profile_id, "local_save_folder", local_save_folder)
+        io_config_file("profiles_file", "write", profile_id, "game_executable", game_executable)
+        io_config_file("profiles_file", "write", profile_id, "sync_mode", sync_mode)
 
         profile_folder = os.path.join(cloud_storage_path, profile_id)
 
-        profile_info_file_path = os.path.join(profile_folder, "profile_info.savetitan")
+        profile_info_file_path = os.path.join(cloud_storage_path, profile_id, "profile_info.savetitan")
         profile_info_config = configparser.ConfigParser()
         profile_info_config.read(profile_info_file_path)
+        save_slot = profile_info_config.get(profile_id, "save_slot")
 
         profile_info_config.set(profile_id, "name", profile_name)
-
         profile_info_config.set(profile_id, "executable_name", os.path.basename(game_executable))
 
         with open(profile_info_file_path, "w") as file:

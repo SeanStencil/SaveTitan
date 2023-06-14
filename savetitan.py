@@ -1641,4 +1641,4 @@ else:
     show_config_dialog()
     app.exec_()
     
-app.exec_()
+sys.exit()

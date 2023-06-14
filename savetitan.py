@@ -1353,7 +1353,6 @@ def show_config_dialog():
         if index.isValid():
             row_data = configprofileView.model().sourceModel()._data[index.row()]
             profile_id = row_data[2]
-
             try:
                 profile_data = io_config_file("profiles_file", "read", profile_id)
                 profile_fields = profile_data[profile_id]
@@ -1362,11 +1361,8 @@ def show_config_dialog():
                 local_save_folder = profile_fields.get("local_save_folder")
                 save_slot = profile_fields.get("save_slot")
                 sync_mode = profile_fields.get("sync_mode")
-            
-                name, local_save_folder, game_executable, save_slot, _, sync_mode = io_config_file(profile_id)
             except Exception as e:
                 return
-
             try:
                 dialog.profilenameField.setText(name)
                 dialog.executableField.setText(game_executable)

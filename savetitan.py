@@ -46,7 +46,7 @@ def check_permissions(path, file_type, action):
     return True
 
 
-# Try and wake up the network location
+# REFACTORED FUNCTION: Try and wake up the network location
 def network_share_accessible():
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
 
@@ -126,31 +126,52 @@ def io_savetitan_file(global_config_file, read_write_mode, profile_id, field, wr
         raise ValueError("Invalid read_write_mode. Expected 'read' or 'write'.")
 
 
-# Function to sync saves (Copy local saves to cloud storage)
+# REFACTORED FUNCTION: Checks for file mismatch
+def check_folder_mismatch(folder_a, folder_b):
+    comparison = filecmp.dircmp(folder_a, folder_b)
+
+    def compare_dirs(comp):
+        if comp.diff_files or comp.left_only or comp.right_only or comp.funny_files:
+            return True
+
+        match, mismatch, errors = filecmp.cmpfiles(comp.left, comp.right, comp.common_files, shallow=False)
+        if mismatch or errors:
+            return True
+
+        for subcomp in comp.subdirs.values():
+            if compare_dirs(subcomp):
+                return True
+
+        return False
+
+    return compare_dirs(comparison)
+
+
+# REFACTORED FUNCTION: Function to sync saves (Copy local saves to cloud storage)
 def sync_save_cloud(profile_id):
+    local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
     save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
+
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
+
     if not network_share_accessible():
         return
+        
     while True:
         try:
             os.makedirs(cloud_profile_save_path, exist_ok=True)
             
-            make_backup_copy(cloud_profile_save_path)
+            make_backup_copy(profile_id, "cloud_backup")
             
             shutil.rmtree(cloud_profile_save_path)
             shutil.copytree(local_save_folder, cloud_profile_save_path)
             
-            comparison = filecmp.dircmp(local_save_folder, cloud_profile_save_path)
-
-            if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-                match, mismatch, errors = filecmp.cmpfiles(local_save_folder, cloud_profile_save_path, comparison.common_files)
-                if len(mismatch) == 0 and len(errors) == 0:
-                    print("Sync completed successfully.")
-                    break
-            else:
+            if check_folder_mismatch(local_save_folder, cloud_profile_save_path):
                 raise Exception("Mismatch in directory contents")
+            else:
+                print("Sync completed successfully.")
+                break
         except Exception as e:
             reply = QMessageBox.critical(None, "Sync Error",
                                          f"An error occurred during the sync process: {str(e)}",
@@ -159,35 +180,30 @@ def sync_save_cloud(profile_id):
                 break
 
 
-# Function to sync saves (Copy cloud saves to local storage)
-def sync_save_local(profile_id, save_slot):
-    local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_path")
+# REFACTORED FUNCTION: Function to sync saves (Copy cloud saves to local storage)
+def sync_save_local(profile_id):
+    local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
-
-    source_folder = os.path.join(cloud_storage_path, profile_id, "save" + save_slot)
-    destination_folder = local_save_folder
+    save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
+    cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
 
     if not network_share_accessible():
         return
 
     while True:
         try:
-            os.makedirs(destination_folder, exist_ok=True)
+            os.makedirs(local_save_folder, exist_ok=True)
 
-            make_backup_copy(destination_folder)
+            make_backup_copy(profile_id, "local_backup")
 
-            if check_permissions(destination_folder, 'destination folder', "write") and check_permissions(source_folder, 'source folder', "read"):
-                shutil.rmtree(destination_folder)
-                shutil.copytree(source_folder, destination_folder)
+            shutil.rmtree(local_save_folder)
+            shutil.copytree(cloud_profile_save_path, local_save_folder)
 
-                comparison = filecmp.dircmp(source_folder, destination_folder)
-
-                if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-                    match, mismatch, errors = filecmp.cmpfiles(source_folder, destination_folder, comparison.common_files)
-                    if len(mismatch) == 0 and len(errors) == 0:
-                        break
-                else:
-                    raise Exception("Mismatch in directory contents")
+            if check_folder_mismatch(cloud_profile_save_path, local_save_folder):
+                raise Exception("Mismatch in directory contents")
+            else:
+                print("Sync completed successfully.")
+                break
         except Exception as e:
             reply = QMessageBox.critical(None, "Sync Error",
                                          f"An error occurred during the sync process: {str(e)}",
@@ -196,32 +212,31 @@ def sync_save_local(profile_id, save_slot):
                 break
 
 
-# Perform backup function prior to sync
-def make_backup_copy(original_folder):
-    backup_folder = original_folder + ".bak"
-    while True:
-        try:
-            if check_permissions(backup_folder, 'backup folder', "write") and check_permissions(original_folder, 'original folder', "read"):
-                if os.path.exists(backup_folder):
-                    shutil.rmtree(backup_folder)
+# REFACTORED FUNCTION: Perform backup function prior to sync
+def make_backup_copy(profile_id, which_side):
+    cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
+    save_slot = io_config_file("profiles_file", "read", profile_id, "save_slot")
+    cloud_profile_folder_save = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
+    cloud_profile_folder_save_bak = cloud_profile_folder_save + ".bak"
 
-                shutil.copytree(original_folder, backup_folder)
+    if which_side not in ["local_backup", "cloud_backup"]:
+        raise Exception("Invalid which_side argument")
 
-                comparison = filecmp.dircmp(original_folder, backup_folder)
+    os.makedirs(cloud_profile_folder_save_bak, exist_ok=True)
 
-                if comparison.left_list == comparison.right_list and not comparison.diff_files and not comparison.common_funny:
-                    match, mismatch, errors = filecmp.cmpfiles(original_folder, backup_folder, comparison.common_files)
-                    if len(mismatch) == 0 and len(errors) == 0:
-                        break
-                else:
-                    raise Exception("Mismatch in directory contents")
-        except Exception as e:
-            reply = QMessageBox.warning(None, "Backup Error",
-                                        f"There was an error making a backup copy: {str(e)}. "
-                                        "Please verify the source and destination folders, and try again.",
-                                        QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
-            if reply != QMessageBox.Retry:
-                break
+    if which_side == "local_backup":
+        local_save_folder = io_config_file("profiles_file", "read", profile_id, "local_save_folder")
+        
+        if os.path.exists(cloud_profile_folder_save_bak):
+            shutil.rmtree(cloud_profile_folder_save_bak)
+
+        shutil.copytree(local_save_folder, cloud_profile_folder_save_bak)
+
+    elif which_side == "cloud_backup":
+        if os.path.exists(cloud_profile_folder_save_bak):
+            shutil.rmtree(cloud_profile_folder_save_bak)
+
+        shutil.copytree(cloud_profile_folder_save, cloud_profile_folder_save_bak)
 
 
 # REFACTORED FUNCTION: Function to check and sync saves
@@ -337,7 +352,7 @@ def check_and_sync_saves(profile_id):
                 sync_diag.cloud_indication.setText("Cloud Copy: Older")
 
             def on_nosyncButton_clicked():
-                launch_game_without_sync(game_executable)
+                launch_game_without_sync(profile_id)
                 io_savetitan_file(profile_info_savetitan_path, "write", profile_id, "checkout", None)
                 sync_diag.accept()
             
@@ -356,7 +371,7 @@ def check_and_sync_saves(profile_id):
         launch_game(profile_id)
 
 
-# Function to launch the game
+# REFACTORED FUNCTION: Function to launch the game
 def launch_game(profile_id):
     game_executable = io_config_file("profiles_file", "read", profile_id, "game_executable")
     profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
@@ -382,6 +397,19 @@ def launch_game(profile_id):
         io_savetitan_file(profile_info_savetitan_path, "write", profile_id, "checkout", None)
 
     QTimer.singleShot(0, launch_game_dialog)
+
+
+# REFACTORED FUNCTION: Function to launch the game without sync
+def launch_game_without_sync(game_executable):
+    game_executable = io_config_file("profiles_file", "read", profile_id, "game_executable")
+    profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
+    
+    if not check_permissions(game_executable, 'game executable', "execute"):
+        return
+
+    subprocess.Popen(game_executable)
+    
+    sys.exit()
 
 
 # REFACTORED FUNCTION: Parse command-line arguments

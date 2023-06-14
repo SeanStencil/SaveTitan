@@ -1530,6 +1530,7 @@ def show_config_dialog():
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
+        open_save_mgmt_action.setEnabled(False)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)

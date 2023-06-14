@@ -1640,6 +1640,5 @@ elif args.runid:
     check_and_sync_saves(profile_id)
 else:
     show_config_dialog()
-    app.exec_()
     
-sys.exit()
+app.exec_()

@@ -47,6 +47,9 @@ def check_permissions(path, file_type, action):
         "execute": os.X_OK
     }
 
+    if not os.path.exists(path):
+        return True
+
     if not os.access(path, actions[action]):
         QMessageBox.critical(None, "Access Denied",
                              f"Permission denied to {action} the {file_type}. Please check the file permissions and try again.")
@@ -89,8 +92,9 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
 
     config.read(config_file)
 
-    if config_type == "profiles_file" and read_write_mode == "read" and not config.has_section(profile_id) and not write_value:
-        return None
+    if config_type == "profiles_file" and read_write_mode == "read" and profile_id and not config.has_section(profile_id):
+            print("No section found for provided profile_id, returning None")
+            return None
 
     if read_write_mode == "read":
         if not field:
@@ -99,7 +103,7 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
             if field.lower() == "name" and write_value:
                 for section in config.sections():
                     if config.has_option(section, field) and config.get(section, field).lower() == write_value.lower():
-                        return config.get(section, field)
+                        return section
                 return None
             else:
                 return config.get(config_section, field) if config.has_option(config_section, field) else None
@@ -111,10 +115,10 @@ def io_config_file(config_type, read_write_mode, profile_id=None, field=None, wr
         if not field:
             raise ValueError("Field must be specified in 'write' mode.")
 
-        if not config.has_section(profile_id):
-            config.add_section(profile_id)
+        if not config.has_section(config_section):
+            config.add_section(config_section)
 
-        config.set(profile_id, field, write_value or "")
+        config.set(config_section, field, write_value or "")
         with open(config_file, "w") as file:
             config.write(file)
 
@@ -486,43 +490,47 @@ def launch_game_without_sync(game_executable):
     sys.exit()
 
 
-# REFACTORED FUNCTION: Function to set the cloud storage location
+# Function to set the cloud storage location
 def set_cloud_storage_path():
-    current_cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
+    current_cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path") or ""
+    if not os.path.isdir(current_cloud_storage_path):
+        current_cloud_storage_path = ""
 
-    cloud_storage_path = QFileDialog.getExistingDirectory(None, "Select Cloud Storage Path", current_cloud_storage_path)
-    if not cloud_storage_path:
-        return  # If no path is selected, return from function.
-
-    if not os.path.exists(cloud_storage_path):
-        QMessageBox.warning(None, "Invalid Path",
-                            "The selected path does not exist. Please select another path.")
-        return  # Return from function if the path doesn't exist.
-
-    subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
-    savetitan_files_found = False
-    for subfolder in subfolders:
-        savetitan_files = glob.glob(os.path.join(subfolder, "*.savetitan"))
-        if len(savetitan_files) > 0:
-            savetitan_files_found = True
+    while True:
+        cloud_storage_path = QFileDialog.getExistingDirectory(None, "Select Cloud Storage Path", current_cloud_storage_path)
+        if not cloud_storage_path:
             break
 
-    if savetitan_files_found:
-        QMessageBox.information(None, "Existing SaveTitan Cloud Folder Detected",
-                                "This appears to be an existing SaveTitan cloud folder. "
-                                "Make sure to use the 'Import' button to import existing profiles.")
-    elif not savetitan_files_found and len(os.listdir(cloud_storage_path)) > 0:
-        response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
-                                       "WARNING: The selected cloud storage path is not empty. "
-                                       "Would you like to create a new SaveTitan directory in it?",
-                                       QMessageBox.Yes | QMessageBox.No)
-        if response == QMessageBox.Yes:
-            cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
-            os.makedirs(cloud_storage_path, exist_ok=True)
-        else:
-            return  # If user doesn't want to create a SaveTitan directory, return from function.
+        if not os.path.exists(cloud_storage_path):
+            QMessageBox.warning(None, "Invalid Path",
+                                "The selected path does not exist. Please select another path.")
+            continue
 
-    io_config_file("global_file", "write", None, "cloud_storage_path", cloud_storage_path)
+        subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
+        savetitan_files_found = False
+        for subfolder in subfolders:
+            savetitan_files = glob.glob(os.path.join(subfolder, "*.savetitan"))
+            if len(savetitan_files) > 0:
+                savetitan_files_found = True
+                break
+
+        if savetitan_files_found:
+            QMessageBox.information(None, "Existing SaveTitan Cloud Folder Detected",
+                                    "This appears to be an existing SaveTitan cloud folder. "
+                                    "Make sure to use the 'Import' button to import existing profiles.")
+        elif not savetitan_files_found and len(os.listdir(cloud_storage_path)) > 0:
+            response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
+                                           "WARNING: The selected cloud storage path is not empty. "
+                                           "Would you like to create a new SaveTitan directory in it?",
+                                           QMessageBox.Yes | QMessageBox.No)
+            if response == QMessageBox.Yes:
+                cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
+                os.makedirs(cloud_storage_path, exist_ok=True)
+            else:
+                continue
+
+        io_config_file("global_file", "write", None, "cloud_storage_path", cloud_storage_path)
+        break
 
     dialog.addButton.setEnabled(True)
     dialog.importButton.setEnabled(True)
@@ -546,6 +554,7 @@ def center_dialog_over_dialog(first_dialog, second_dialog):
 # Function to show config dialog
 def show_config_dialog():
     global dialog
+
     dialog = uic.loadUi("config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
 
@@ -558,6 +567,30 @@ def show_config_dialog():
     width = int(dialog.width() * dpiScaling)
     height = int(dialog.height() * dpiScaling)
     dialog.setFixedSize(width, height)
+
+    cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
+    if not cloud_storage_path:
+        QMessageBox.warning(None, "Cloud Storage Path Not Set",
+                            "The cloud storage path is not configured. SaveTitan won't function until a cloud storage path is set.")
+        response = QMessageBox.question(None, "Set Cloud Storage Path",
+                                        "Would you like to set the cloud storage path now?", QMessageBox.Yes | QMessageBox.No)
+        if response == QMessageBox.Yes:
+            set_cloud_storage_path()
+    else:
+        if not os.path.exists(cloud_storage_path):
+            QMessageBox.warning(None, "Invalid Cloud Storage Path",
+                                "The current cloud storage location is invalid.")
+            response = QMessageBox.question(None, "Set New Cloud Storage Path",
+                                             "Would you like to set a new cloud storage path?", QMessageBox.Yes | QMessageBox.No)
+            if response == QMessageBox.Yes:
+                set_cloud_storage_path()
+        elif not check_permissions(cloud_storage_path, 'Cloud Storage Path', 'write'):
+            dialog.addButton.setEnabled(False)
+            dialog.importButton.setEnabled(False)
+            dialog.removeButton.setEnabled(False)
+            dialog.actionNewProfile.setEnabled(False)
+            dialog.actionRemoveProfile.setEnabled(False)
+            dialog.actionImportProfile.setEnabled(False)
 
     def load_data_into_model_data():
         profiles_config = configparser.ConfigParser()
@@ -631,30 +664,6 @@ def show_config_dialog():
         selected_index = configprofileView.currentIndex()
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         selected_profile_id = selected_row_data[2]
-
-    cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
-    if not cloud_storage_path:
-        QMessageBox.warning(None, "Cloud Storage Path Not Set",
-                            "The cloud storage path is not configured. SaveTitan won't function until a cloud storage path is set.")
-        response = QMessageBox.question(None, "Set Cloud Storage Path",
-                                        "Would you like to set the cloud storage path now?", QMessageBox.Yes | QMessageBox.No)
-        if response == QMessageBox.Yes:
-            set_cloud_storage_path()
-    else:
-        if not os.path.exists(cloud_storage_path):
-            QMessageBox.warning(None, "Invalid Cloud Storage Path",
-                                "The current cloud storage location is invalid.")
-            response = QMessageBox.question(None, "Set New Cloud Storage Path",
-                                             "Would you like to set a new cloud storage path?", QMessageBox.Yes | QMessageBox.No)
-            if response == QMessageBox.Yes:
-                set_cloud_storage_path()
-        elif not check_permissions(cloud_storage_path, 'Cloud Storage Path', 'write'):
-            dialog.addButton.setEnabled(False)
-            dialog.importButton.setEnabled(False)
-            dialog.removeButton.setEnabled(False)
-            dialog.actionNewProfile.setEnabled(False)
-            dialog.actionRemoveProfile.setEnabled(False)
-            dialog.actionImportProfile.setEnabled(False)
 
 
     # Open global settings dialog
@@ -1541,7 +1550,7 @@ def show_config_dialog():
             menu.addSeparator()
             menu.addAction(delete_profile_action)
             menu.addSeparator()
-            menu.addAction(copy_profile_id_action)  # Add to the context menu
+            menu.addAction(copy_profile_id_action)
 
             menu.exec_(configprofileView.viewport().mapToGlobal(point))
 
@@ -1559,16 +1568,53 @@ def show_config_dialog():
 
 # REFACTORED FUNCTION: Parse command-line arguments
 parser = argparse.ArgumentParser()
+parser.add_argument("-runprofile", help="Specify the game profile to be used")
 parser.add_argument("-runid", help="Specify the profile ID to be used")
+parser.add_argument("-list", action='store_true', help="List all profiles in profiles.ini")
 args = parser.parse_args()
 
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
 app = QApplication([])
+profile_data = None
 
 cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
 
-if args.runid:
+if args.list:
+    profiles = io_config_file("profiles_file", "read")
+    if profiles is None:
+        print("No profiles found in profiles.ini")
+        sys.exit(1)
+    else:
+        for profile_id, profile_data in profiles.items():
+            name = profile_data.get('name')
+            save_slot = profile_data.get('save_slot')
+            print(f"{profile_id} - {name} - Save Slot: {save_slot}")
+        sys.exit(1)
+elif args.runprofile:
+    profile_id = io_config_file("profiles_file", "read", None, "name", args.runprofile)
+    if not profile_id:
+        print("The specified game profile does not exist in profiles.ini")
+        sys.exit(1)
+    else:
+        profile_data = io_config_file("profiles_file", "read", profile_id)
+        if not profile_data or profile_id not in profile_data:
+            sys.exit(1)
+        
+        profile_fields = profile_data[profile_id]
+        name = profile_fields.get("name")
+        local_save_folder = profile_fields.get("local_save_folder")
+        game_executable = profile_fields.get("game_executable")
+        save_slot = profile_fields.get("save_slot")
+        sync_mode = profile_fields.get("sync_mode")
+
+        if not cloud_storage_path:
+            print("Cloud storage path is not configured. Run the script without a parameter to run the first-time setup")
+            sys.exit(1)
+
+        game_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
+        check_and_sync_saves(name, local_save_folder, game_executable, save_slot, profile_id)
+elif args.runid:
     if not cloud_storage_path:
         print("Cloud storage path is not configured. Run the script without a parameter to run the first-time setup")
         sys.exit(1)

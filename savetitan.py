@@ -561,15 +561,7 @@ def show_config_dialog():
     dialog = uic.loadUi("config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
 
-    # Get the DPI scaling factor
-    app = QApplication.instance()
-    screen = app.screens()[0]
-    dpiScaling = screen.logicalDotsPerInch() / 96.0
-
-    # Adjust the size of the dialog based on the DPI scaling factor
-    width = int(dialog.width() * dpiScaling)
-    height = int(dialog.height() * dpiScaling)
-    dialog.setFixedSize(width, height)
+    dialog.setFixedSize(dialog.size())
 
     cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
     if not cloud_storage_path:

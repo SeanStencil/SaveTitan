@@ -13,12 +13,16 @@ import glob
 import stat
 import logging
 import socket
+import json
+import configparser
+import re
 
 
+from xml.etree import ElementTree
 from datetime import datetime, timedelta
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem
-from PyQt5.QtGui import QIcon, QDesktopServices
+from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardItem
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
 
@@ -31,10 +35,10 @@ profiles_config_file = os.path.join(script_dir, "profiles.ini")
 global_config_file = os.path.join(script_dir, "global.ini")
 
 
-# Generate a 16 character string for use for profile_id's
+# Generate a 8 character string for use for profile_id's
 def generate_id():
     characters = string.ascii_letters + string.digits
-    id_length = 16
+    id_length = 8
     random_id = ''.join(random.choices(characters, k=id_length))
     return random_id
 
@@ -1465,8 +1469,7 @@ def show_config_dialog():
         open_local_save_action = QAction("Open Local Save", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
-        open_save_editor_action = QAction("Open Save Editor", menu)
-        open_save_editor_action.setEnabled(False)
+        open_save_editor_action = QAction("Open Config Editor", menu)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)
@@ -1478,6 +1481,7 @@ def show_config_dialog():
             open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
             delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
             open_save_mgmt_action.triggered.connect(lambda: save_mgmt_dialog(selected_profile_id))
+            open_save_editor_action.triggered.connect(lambda: ConfigEditorDialog(selected_profile_id).exec_())
             copy_profile_id_action.triggered.connect(lambda: QApplication.clipboard().setText(selected_profile_id))
 
             menu.addAction(open_local_save_action)
@@ -1492,6 +1496,231 @@ def show_config_dialog():
 
             menu.exec_(configprofileView.viewport().mapToGlobal(point))
 
+
+    class ConfigEditorDialog(QDialog):
+        def __init__(self, profile_id, parent=None):
+            super().__init__(parent)
+
+            self.ui = uic.loadUi("config_editor.ui", self)
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
+            self.setFixedSize(self.size())
+            
+            #self.ui.editor_tableView.setEnabled(False)
+
+            self.profile_id = profile_id
+            
+            self.file_formats = {}
+
+            self.file_combo_box = self.ui.file_comboBox
+            self.section_combo_box = self.ui.section_comboBox
+            self.filter_edit_box = self.ui.filter_lineEdit
+            self.editor_table_view = self.ui.editor_tableView
+
+            self.apply_button = self.ui.apply_pushButton
+            self.okay_button = self.ui.okay_pushButton
+            self.reset_button = self.ui.reset_pushButton
+
+            self.apply_button.clicked.connect(self.save_changes)
+            self.okay_button.clicked.connect(self.save_changes_and_close)
+
+            self.populate_file_combo_box()
+
+            self.table_model = QStandardItemModel()
+            self.editor_table_view.setModel(self.table_model)
+
+            self.editor_table_view.verticalHeader().setVisible(False)
+
+            self.file_combo_box.currentIndexChanged.connect(self.populate_section_combo_box)
+            self.section_combo_box.currentIndexChanged.connect(self.populate_table_view)
+
+            self.populate_table_view()
+
+        def populate_file_combo_box(self):
+            profile_data = io_config_file("profiles_file", "read", self.profile_id)
+            local_save_folder = io_config_file("profiles_file", "read", self.profile_id, "local_save_folder")
+
+            file_paths = []
+            for root, dirs, files in os.walk(local_save_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    _, ext = os.path.splitext(file_path)
+                    if ext.lower() == '.ini':
+                        with open(file_path, 'r') as f:
+                            first_line = f.readline().strip()
+                            if re.match('\[.*\]', first_line):
+                                file_paths.append(file_path)
+                                self.file_formats[file_path] = '.ini'
+                    elif ext.lower() == '.json':
+                        file_paths.append(file_path)
+                        self.file_formats[file_path] = '.json'
+
+            self.file_combo_box.clear()
+            self.file_combo_box.addItems(["Files"] + file_paths)
+
+
+        def flatten_json(self, y):
+            out = {}
+
+            def flatten(x, name=''):
+                if type(x) is dict:
+                    for a in x:
+                        flatten(x[a], name + a + '/')
+                elif type(x) is list:
+                    i = 0
+                    for a in x:
+                        flatten(a, name + str(i) + '/')
+                        i += 1
+                else:
+                    out[name[:-1]] = x
+
+            flatten(y)
+            return out
+
+            self.file_combo_box.clear()
+            self.file_combo_box.addItems(["Files"] + file_paths)
+            
+            
+        def populate_section_combo_box(self):
+            file_path = self.file_combo_box.currentText()
+
+            if file_path == "Files":
+                return
+
+            self.section_combo_box.clear()
+
+            if self.file_formats[file_path] == '.ini':
+                config = configparser.ConfigParser()
+                config.read(file_path)
+
+                self.section_combo_box.addItems(config.sections())
+                
+            elif self.file_formats[file_path] == '.json':
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    sections = set(key.rsplit('/', 1)[0] for key in self.flatten_json(data).keys())
+                    self.section_combo_box.addItems(list(sections))
+        
+        
+        def populate_table_view(self):
+            file_path = self.file_combo_box.currentText()
+            section = self.section_combo_box.currentText()
+
+            if file_path == "Files":
+                return
+
+            self.table_model.clear()
+
+            self.table_model.setHorizontalHeaderLabels(["Field", "Value"])
+
+            self.editor_table_view.resizeRowsToContents()
+
+            file_format = self.file_formats.get(file_path)
+
+            if file_format == '.ini':
+                config = configparser.ConfigParser()
+                config.read(file_path)
+
+                if section in config:
+                    self.ui.editor_tableView.setEnabled(True)
+                    for key, value in config.items(section):
+                        self.add_row_to_table(key, value)
+                        self.editor_table_view.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+                        self.editor_table_view.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+
+            elif file_format == '.json':
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    flattened_data = self.flatten_json(data)
+
+                    section += '/'
+
+                    for key in flattened_data:
+                        if key.startswith(section):
+                            self.ui.editor_tableView.setEnabled(True)
+                            modified_key = key.replace(section, '')
+                            value = flattened_data[key]
+                            if '/' not in modified_key:
+                                self.add_row_to_table(modified_key, str(value))
+
+                    stripped_section = section.strip('/')
+                    if stripped_section in data and not isinstance(data[stripped_section], (dict, list)):
+                        self.add_row_to_table("Value", str(data[stripped_section]))
+
+            self.editor_table_view.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+            self.editor_table_view.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+
+
+        def add_row_to_table(self, key, value):
+            if isinstance(value, list):
+                value = ', '.join(map(str, value))
+
+            key_item = QStandardItem(key)
+            value_item = QStandardItem(value)
+
+            key_item.setEditable(False)
+
+            self.table_model.appendRow([key_item, value_item])
+
+
+        def save_changes(self):
+            file_path = self.file_combo_box.currentText()
+
+            cloud_storage_path = io_config_file("global_file", "read", None, "cloud_storage_path")
+            backup_folder_path = os.path.join(cloud_storage_path, str(self.profile_id), "config_backup")
+
+            hostname = socket.gethostname()
+
+            path_parts = os.path.normpath(file_path).split(os.sep)
+
+            necessary_part_path = os.path.join(*(hostname, path_parts[0].replace(':', ''), *path_parts[1:]))
+
+            backup_file_path = os.path.join(backup_folder_path, necessary_part_path)
+
+            os.makedirs(os.path.dirname(backup_file_path), exist_ok=True)
+
+            if not os.path.exists(backup_file_path):
+                shutil.copy2(file_path, backup_file_path)
+
+            file_format = self.file_formats.get(file_path)
+            if file_format == '.ini':
+                config = configparser.ConfigParser()
+                for row in range(self.table_model.rowCount()):
+                    key = self.table_model.item(row, 0).text()
+                    value = self.table_model.item(row, 1).text()
+                    config.set('DEFAULT', key, value)
+
+                with open(file_path, 'w') as file:
+                    config.write(file)
+
+            elif file_format == '.json':
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    flattened_data = self.flatten_json(data)
+                    section = self.section_combo_box.currentText() + '/'
+                    for row in range(self.table_model.rowCount()):
+                        key = self.table_model.item(row, 0).text()
+                        value = self.table_model.item(row, 1).text()
+                        complete_key = section + key
+                        if complete_key in flattened_data:
+                            keys = complete_key.split('/')
+                            sub_data = data
+                            for sub_key in keys[:-1]:
+                                sub_data = sub_data[sub_key]
+                            sub_data[keys[-1]] = value
+
+                with open(file_path, 'w') as f:
+                    json.dump(data, f, indent=4)
+                    
+            msgBox = QMessageBox()
+            msgBox.setWindowTitle("Config File Saved")
+            msgBox.setText(f"The configuration file has been saved successfully.\n\nA backup of the original file has been stored at:\n{backup_file_path}")
+            msgBox.exec_()
+
+        def save_changes_and_close(self):
+            self.save_changes()
+            self.accept()
+            
+        
     configprofileView.setContextMenuPolicy(Qt.CustomContextMenu)
     configprofileView.customContextMenuRequested.connect(context_menu)
     
@@ -1501,7 +1730,7 @@ def show_config_dialog():
     dialog.actionExit.triggered.connect(dialog.close)
     dialog.actionAbout.triggered.connect(lambda: about_dialog(dialog))
 
-    dialog.show()
+    dialog.show()        
 
 
 # Parse command-line arguments

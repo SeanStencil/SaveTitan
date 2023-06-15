@@ -148,7 +148,7 @@
    <property name="title">
     <string>Cloud Sync</string>
    </property>
-   <widget class="QRadioButton" name="backupRadio">
+   <widget class="QRadioButton" name="syncdisableRadio">
     <property name="enabled">
      <bool>true</bool>
     </property>
@@ -164,7 +164,7 @@
      <string>Disabled</string>
     </property>
    </widget>
-   <widget class="QRadioButton" name="syncRadio">
+   <widget class="QRadioButton" name="syncenableRadio">
     <property name="geometry">
      <rect>
       <x>13</x>

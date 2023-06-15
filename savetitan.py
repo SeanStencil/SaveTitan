@@ -903,7 +903,7 @@ def show_config_dialog():
                 QMessageBox.critical(None, "Profile Already Exists", "A profile with the same name already exists. Please choose a different name.")
                 continue
 
-            sync_mode = "Sync" if add_profile_dialog.syncRadio.isChecked() else "Backup"
+            sync_mode = "Sync" if add_profile_dialog.syncenableRadio.isChecked() else ""
 
             profile_id = None
             while True:
@@ -1361,75 +1361,18 @@ def show_config_dialog():
                 game_executable = profile_fields.get("game_executable")
                 local_save_folder = profile_fields.get("local_save_folder")
                 save_slot = profile_fields.get("save_slot")
-                sync_mode = profile_fields.get("sync_mode")
+                sync_mode = profile_fields.get("sync_mode", "Sync") # set default to "Sync" if it's not specified
             except Exception as e:
                 return
+
             try:
                 dialog.profilenameField.setText(name)
                 dialog.executableField.setText(game_executable)
                 dialog.saveField.setText(local_save_folder)
+                dialog.syncenableRadio.setChecked(sync_mode == "Sync")
+                dialog.syncdisableRadio.setChecked(sync_mode != "Sync")
             except Exception as e:
                 return
-
-
-    # Function to save field information to selected profile
-    def save_profile_fields():
-        selected_index = configprofileView.currentIndex()
-        if not selected_index.isValid():
-            QMessageBox.warning(None, "No Profile Selected", "Please select a profile to save the fields.")
-            return
-
-        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        profile_id = selected_row_data[2]
-
-        config = configparser.ConfigParser()
-        config.read(profiles_config_file)
-
-        if profile_id not in config.sections():
-            QMessageBox.warning(None, "Profile Not Found", "The selected profile does not exist.")
-            return
-
-        profile_name = dialog.profilenameField.text()
-        local_save_folder = dialog.saveField.text()
-        game_executable = dialog.executableField.text()
-        sync_mode = config.get(profile_id, "sync_mode", fallback="Sync")
-
-        for section in config.sections():
-            if section != profile_id and config.get(section, 'name').lower() == profile_name.lower():
-                QMessageBox.critical(None, "Profile Already Exists", 
-                                     "A profile with the same name already exists. Please choose a different name.")
-                return
-
-        config.set(profile_id, "name", profile_name)
-        config.set(profile_id, "local_save_folder", local_save_folder)
-        config.set(profile_id, "game_executable", game_executable)
-        config.set(profile_id, "sync_mode", sync_mode)
-        save_config_file(config)
-
-        profile_folder = os.path.join(cloud_storage_path, profile_id)
-
-        profile_info_file_path = os.path.join(cloud_storage_path, profile_id, "profile_info.savetitan")
-        profile_info_config = configparser.ConfigParser()
-        profile_info_config.read(profile_info_file_path)
-        save_slot = profile_info_config.get(profile_id, "save_slot")
-
-        profile_info_config.set(profile_id, "name", profile_name)
-
-        profile_info_config.set(profile_id, "executable_name", os.path.basename(game_executable))
-
-        with open(profile_info_file_path, "w") as file:
-            profile_info_config.write(file)
-
-        configprofileView.model().sourceModel()._data = load_data_into_model_data()
-        
-        for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):
-            if configprofileView.model().sourceModel()._data[i][2] == profile_id:
-                new_index = configprofileView.model().index(i, 0)
-                configprofileView.setCurrentIndex(new_index)
-                update_fields(new_index)
-                break
-
-        QMessageBox.information(None, "Profile Saved", "The profile has been successfully saved.")
 
 
     # Function to save field information to selected profile
@@ -1450,20 +1393,23 @@ def show_config_dialog():
         profile_name = dialog.profilenameField.text()
         local_save_folder = dialog.saveField.text()
         game_executable = dialog.executableField.text()
-        sync_mode = profile_data.get("sync_mode", "Sync")
+        sync_mode = "Sync" if dialog.syncenableRadio.isChecked() else ""
 
-        if profile_name.lower() in [io_config_file("profiles_file", "read", sec, "name").lower() for sec in io_config_file("profiles_file", "read") if sec != profile_id]:
-            QMessageBox.critical(None, "Profile Already Exists", 
-                                 "A profile with the same name already exists. Please choose a different name.")
-            return
+        profiles_data = io_config_file("profiles_file", "read")
+        for section in profiles_data:
+            if section != profile_id and profiles_data[section]['name'].lower() == profile_name.lower():
+                QMessageBox.critical(None, "Profile Already Exists",
+                                     "A profile with the same name already exists. Please choose a different name.")
+                return
 
+        # Update profile fields
         io_config_file("profiles_file", "write", profile_id, "name", profile_name)
         io_config_file("profiles_file", "write", profile_id, "local_save_folder", local_save_folder)
         io_config_file("profiles_file", "write", profile_id, "game_executable", game_executable)
         io_config_file("profiles_file", "write", profile_id, "sync_mode", sync_mode)
 
+        # Update the profile_info file
         profile_folder = os.path.join(cloud_storage_path, profile_id)
-
         profile_info_file_path = os.path.join(cloud_storage_path, profile_id, "profile_info.savetitan")
         profile_info_config = configparser.ConfigParser()
         profile_info_config.read(profile_info_file_path)
@@ -1475,8 +1421,9 @@ def show_config_dialog():
         with open(profile_info_file_path, "w") as file:
             profile_info_config.write(file)
 
+        # Reload the data into the view model
         configprofileView.model().sourceModel()._data = load_data_into_model_data()
-        
+
         for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):
             if configprofileView.model().sourceModel()._data[i][2] == profile_id:
                 new_index = configprofileView.model().index(i, 0)

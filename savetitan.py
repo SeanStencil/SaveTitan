@@ -37,7 +37,7 @@ global_config_file = os.path.join(script_dir, "global.ini")
 
 # Generate a 8 character string for use for profile_id's
 def generate_id():
-    characters = string.ascii_letters + string.digits
+    characters = string.ascii_lowercase + string.digits
     id_length = 8
     random_id = ''.join(random.choices(characters, k=id_length))
     return random_id
@@ -216,32 +216,20 @@ def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=N
                 return dict(config.items(section))
             else:
                 return None
-
     elif read_write_mode == "write":
-        if not field or not write_value:
-            raise ValueError("For write operation, both field and write_value are required.")
+        if not field:
+            raise ValueError("For write operation, field is required.")
         
         if not config.has_section(section):
             config.add_section(section)
-        
-        config.set(section, field, str(write_value))
+
+        write_value = "" if write_value is None else str(write_value)
+        config.set(section, field, write_value)
         
         with open(profile_info_path, 'w') as configfile:
             config.write(configfile)
-
-    elif read_write_mode == "delete":
-        if not field:
-            raise ValueError("For delete operation, field is required.")
-        
-        if config.has_option(section, field):
-            config.remove_option(section, field)
-        
-            with open(profile_info_path, 'w') as configfile:
-                config.write(configfile)
-        else:
-            raise ValueError(f"No such field '{field}' in section '{section}'.")
     else:
-        raise ValueError("Invalid operation. Expected 'read', 'write' or 'delete'.")
+        raise ValueError("Invalid operation. Expected 'read' or 'write'.")
 
 
 # Checks for file mismatch
@@ -357,7 +345,7 @@ def make_backup_copy(profile_id, which_side):
         shutil.copytree(cloud_profile_folder_save, cloud_profile_folder_save_bak)
 
 
-def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, executable_name):
+def export_profile_info(profile_name, profile_id, sync_mode, executable_name):
     if not network_share_accessible():
         QMessageBox.critical(None, "Add Profile Aborted",
                              "The network location is not accessible, the process to add the profile has been aborted.")
@@ -371,40 +359,24 @@ def export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, e
 
     profile_info_fields = [
         ("name", profile_name),
-        ("save_slot", str(save_slot)),
-        ("saves", str(saves)),
+        ("save_slot", "1"),
+        ("saves", "1"),
         ("sync_mode", sync_mode),
         ("executable_name", executable_name),
         ("checkout", "")
     ]
 
     for field, value in profile_info_fields:
-        try:
-            io_savetitan("write", profile_id, profile_id, field, value)
-        except Exception as e:
-            QMessageBox.critical(None, "Add Profile Aborted",
-                                 f"Error exporting profile info: {str(e)}. The process to add the profile has been aborted.")
-            return
+        io_savetitan("write", profile_id, "profile", field, value)
 
-    try:
-        io_savetitan("write", profile_id, "saves", "save1", "Save 1")
-    except Exception as e:
-        QMessageBox.critical(None, "Add Profile Aborted",
-                             f"Error exporting profile info: {str(e)}. The process to add the profile has been aborted.")
-        return
-
-    try:
-        io_savetitan("delete", profile_id, profile_id, "profile_id")
-    except Exception as e:
-        QMessageBox.critical(None, "Add Profile Aborted",
-                             f"Error exporting profile info: {str(e)}. The process to add the profile has been aborted.")
+    io_savetitan("write", profile_id, "saves", "save1", "Save 1")
 
 
 # Function to check and sync saves
 def check_and_sync_saves(profile_id):
     #Load data set
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-    cloud_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
+
     profile_fields = io_profile("read", profile_id, "profile")
 
     name = profile_fields.get("name")
@@ -412,15 +384,15 @@ def check_and_sync_saves(profile_id):
     local_save_folder = profile_fields.get("local_save_folder")
     save_slot = profile_fields.get("save_slot")
     sync_mode = profile_fields.get("sync_mode")
-    cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "save" + save_slot)
-    profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
+
+    cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id, "save" + save_slot)
 
     if sync_mode != "Sync":
         launch_game_without_sync(game_executable)
         return
 
     # Check: Checkout Hostname
-    checkout_previous_user = io_savetitan("read", profile_id, None, "checkout")
+    checkout_previous_user = io_savetitan("read", profile_id, "profile", "checkout")
     checkout_current_user = socket.gethostname()
     if checkout_previous_user and checkout_previous_user != checkout_current_user:
         checkout_msgbox = QMessageBox()
@@ -438,12 +410,14 @@ def check_and_sync_saves(profile_id):
         if result == -1 or checkout_msgbox.clickedButton() == no_button:
             sys.exit()
         elif checkout_msgbox.clickedButton() == yes_button:
-            io_savetitan("write", profile_id, None, "checkout", checkout_current_user)
+            io_savetitan("write", profile_id, "profile", "checkout", checkout_current_user)
 
     elif not checkout_previous_user:
-        io_savetitan("write", profile_id, None, "checkout", checkout_current_user)
+        io_savetitan("write", profile_id, "profile", "checkout", checkout_current_user)
 
     # Check: If files with the same name are identical
+    print("comparing: ", cloud_profile_save_path, " with ", cloud_profile_save_path)
+
     if os.path.exists(cloud_profile_save_path) and os.listdir(cloud_profile_save_path):
         files_identical = True
         for dirpath, dirnames, filenames in os.walk(local_save_folder):
@@ -516,11 +490,11 @@ def check_and_sync_saves(profile_id):
 
             def on_nosyncButton_clicked():
                 launch_game_without_sync(profile_id)
-                io_savetitan("write", profile_id, None, "checkout", None)
+                io_savetitan("write", profile_id, "profile", "checkout", None)
                 sync_diag.accept()
             
             def on_rejected_connect():
-                io_savetitan("write", profile_id, None, "checkout", None)
+                io_savetitan("write", profile_id, "profile", "checkout", None)
                 sys.exit()
 
             sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(profile_id), launch_game(profile_id), sync_diag.accept()])
@@ -557,7 +531,7 @@ def launch_game(profile_id):
         if message_box.clickedButton() == done_button:
             sync_save_cloud(profile_id)
 
-        io_savetitan("write", profile_id, None, "checkout")
+        io_savetitan("write", profile_id, "profile", "checkout")
 
     QTimer.singleShot(0, launch_game_dialog)
 
@@ -966,35 +940,28 @@ def show_config_dialog():
                 if not io_profile("read", profile_id, "profile", "profile_id", profile_id):
                     break
 
-            save_slot = 1
-            saves = 1
-
             profile_folder = os.path.join(cloud_storage_path, profile_id)
             os.makedirs(profile_folder, exist_ok=True)
 
-            try:
-                export_profile_info(profile_name, save_slot, saves, profile_id, sync_mode, os.path.basename(game_executable))
+            export_profile_info(profile_name, profile_id, sync_mode, os.path.basename(game_executable))
 
-                profile_fields = {
-                    "name": profile_name,
-                    "local_save_folder": local_save_folder,
-                    "game_executable": game_executable,
-                    "save_slot": str(save_slot),
-                    "saves": str(saves),
-                    "sync_mode": sync_mode,
-                }
+            profile_fields = {
+                "name": profile_name,
+                "local_save_folder": local_save_folder,
+                "game_executable": game_executable,
+                "save_slot": "1",
+                "saves": "1",
+                "sync_mode": sync_mode,
+            }
 
-                for field, value in profile_fields.items():
-                    io_profile("write", profile_id, "profile", field, value)
+            for field, value in profile_fields.items():
+                io_profile("write", profile_id, "profile", field, value)
 
-                new_row_data = [profile_name, sync_mode, profile_id]
-                configprofileView.model().sourceModel()._data.append(new_row_data)
-                configprofileView.model().sourceModel().layoutChanged.emit()
-                configprofileView.reset()
-                break
-
-            except Exception as e:
-                QMessageBox.warning(None, "Profile Creation Error", "There was an error creating the profile. The operation has been aborted.", QMessageBox.Ok)
+            new_row_data = [profile_name, sync_mode, profile_id]
+            configprofileView.model().sourceModel()._data.append(new_row_data)
+            configprofileView.model().sourceModel().layoutChanged.emit()
+            configprofileView.reset()
+            break
 
 
     # Adjusted function to remove a profile

@@ -287,7 +287,7 @@ def check_and_sync_saves(profile_id):
             cloud_save_time_str = cloud_file_time.strftime("%B %d, %Y, %I:%M:%S %p")
 
             # Draw sync dialog
-            sync_diag = uic.loadUi("sync_diag.ui")
+            sync_diag = uic.loadUi("ui/sync_diag.ui")
             sync_diag.local_date.setText(local_save_time_str)
             sync_diag.cloud_date.setText(cloud_save_time_str)
 
@@ -428,7 +428,7 @@ def center_dialog_over_dialog(first_dialog, second_dialog):
 def show_config_dialog():
     global dialog
 
-    dialog = uic.loadUi("config.ui")
+    dialog = uic.loadUi("ui/config.ui")
     dialog.setWindowFlags(dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
 
     dialog.setFixedSize(dialog.size())
@@ -551,7 +551,7 @@ def show_config_dialog():
         
     # Function to open save management dialog
     def save_mgmt_dialog(profile_id):
-        save_mgmt_dialog = uic.loadUi("save_mgmt.ui")
+        save_mgmt_dialog = uic.loadUi("ui/save_mgmt.ui")
         save_mgmt_dialog.setWindowFlags(save_mgmt_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         save_mgmt_dialog.setFixedSize(save_mgmt_dialog.size())
 
@@ -703,7 +703,7 @@ def show_config_dialog():
             return
 
         config_dialog = QApplication.activeWindow()
-        add_profile_dialog = uic.loadUi("add_profile.ui")
+        add_profile_dialog = uic.loadUi("ui/add_profile.ui")
 
         def select_executable():
             file_filter = "Executable Files (*.exe *.bat *.cmd)" if sys.platform == "win32" else "Executable Files (*.sh *.AppImage)"
@@ -819,7 +819,7 @@ def show_config_dialog():
         if not os.path.exists(cloud_storage_path):
             return
 
-        import_profile_dialog = uic.loadUi("import_profile.ui")
+        import_profile_dialog = uic.loadUi("ui/import_profile.ui")
         import_profile_dialog.setWindowFlags(import_profile_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         import_profile_dialog.setFixedSize(import_profile_dialog.size())
         import_profile_dialog.importButton.setEnabled(False)
@@ -1234,7 +1234,7 @@ def show_config_dialog():
         def __init__(self, profile_id, parent=None):
             super().__init__(parent)
 
-            self.ui = uic.loadUi("config_editor.ui", self)
+            self.ui = uic.loadUi("ui/config_editor.ui", self)
             self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
             
             self.ui.editor_tableView.setEnabled(False)

@@ -4,7 +4,6 @@ import filecmp
 import subprocess
 import configparser
 import argparse
-import hashlib
 import random
 import string
 import datetime
@@ -1203,6 +1202,7 @@ def show_config_dialog():
         delete_profile_action = QAction("Delete Profile", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
         open_save_editor_action = QAction("Open Config Editor", menu)
+        open_save_editor_action.setEnabled(False)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)

@@ -229,9 +229,6 @@ def check_and_sync_saves(profile_id):
     elif not checkout_previous_user:
         io_savetitan("write", profile_id, "profile", "checkout", checkout_current_user)
 
-    # Check: If files with the same name are identical
-    print("comparing: ", cloud_profile_save_path, " with ", cloud_profile_save_path)
-
     if os.path.exists(cloud_profile_save_path) and os.listdir(cloud_profile_save_path):
         files_identical = True
         for dirpath, dirnames, filenames in os.walk(local_save_folder):
@@ -908,7 +905,9 @@ def show_config_dialog():
             profile_id = selected_item.data(Qt.UserRole)
 
             profile_data = io_savetitan("read", profile_id, "profile")
+
             profile_name = profile_data["name"]
+            save_slot = profile_data["save_slot"]
             saves = profile_data["saves"]
             sync_mode = profile_data["sync_mode"]
             executable_name = profile_data["executable_name"]
@@ -975,6 +974,7 @@ def show_config_dialog():
             io_profile("write", profile_id, "profile", "name", profile_name)
             io_profile("write", profile_id, "profile", "local_save_folder", local_save_folder)
             io_profile("write", profile_id, "profile", "game_executable", executable_path)
+            io_profile("write", profile_id, "profile", "save_slot", save_slot)
             io_profile("write", profile_id, "profile", "saves", saves)
             io_profile("write", profile_id, "profile", "sync_mode", sync_mode)
             io_profile("write", profile_id, "profile", "executable_name", executable_name)

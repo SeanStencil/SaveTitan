@@ -1221,21 +1221,8 @@ def show_config_dialog():
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[2]
 
-        config = configparser.ConfigParser()
-        config.read(profiles_config_file)
-
-        try:
-            profile_name = config.get(profile_id, "name")
-        except configparser.NoOptionError:
-            QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
-            return
-
-        selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
-        profile_id = selected_row_data[2]
-
-        try:
-            profile_name = config.get(profile_id, "name")
-        except configparser.NoOptionError:
+        profile_name = io_profile("read", profile_id, "profile", "name")
+        if not profile_name:
             QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
             return
 
@@ -1274,18 +1261,14 @@ def show_config_dialog():
         selected_row_data = configprofileView.model().sourceModel()._data[selected_index.row()]
         profile_id = selected_row_data[2]
 
-        config = configparser.ConfigParser()
-        config.read(profiles_config_file)
-
-        try:
-            profile_name = config.get(profile_id, "name")
-        except configparser.NoOptionError:
+        profile_name = io_profile("read", profile_id, "profile", "name")
+        if not profile_name:
             QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
             return
 
         while True:
             save_folder = QFileDialog.getExistingDirectory(None, f"Edit Profile - Locate the save folder for {profile_name}", options=QFileDialog.ShowDirsOnly)
-            
+
             if not save_folder:
                 return
 
@@ -1349,29 +1332,18 @@ def show_config_dialog():
         for section in profiles_data:
             if section != profile_id and profiles_data[section]['name'].lower() == profile_name.lower():
                 QMessageBox.critical(None, "Profile Already Exists",
-                                     "A profile with the same name already exists. Please choose a different name.")
+                                    "A profile with the same name already exists. Please choose a different name.")
                 return
 
-        # Update profile fields
         io_profile("write", profile_id, "profile", "name", profile_name)
         io_profile("write", profile_id, "profile", "local_save_folder", local_save_folder)
         io_profile("write", profile_id, "profile", "game_executable", game_executable)
         io_profile("write", profile_id, "profile", "sync_mode", sync_mode)
 
-        # Update the profile_info file
-        profile_folder = os.path.join(cloud_storage_path, profile_id)
-        profile_info_file_path = os.path.join(cloud_storage_path, profile_id, "profile_info.savetitan")
-        profile_info_config = configparser.ConfigParser()
-        profile_info_config.read(profile_info_file_path)
-        save_slot = profile_info_config.get(profile_id, "save_slot")
+        save_slot = io_savetitan("read", profile_id, "saves", "save_slot")
+        io_savetitan("write", profile_id, "profile", "name", profile_name)
+        io_savetitan("write", profile_id, "profile", "executable_name", os.path.basename(game_executable))
 
-        profile_info_config.set(profile_id, "name", profile_name)
-        profile_info_config.set(profile_id, "executable_name", os.path.basename(game_executable))
-
-        with open(profile_info_file_path, "w") as file:
-            profile_info_config.write(file)
-
-        # Reload the data into the view model
         configprofileView.model().sourceModel()._data = load_data_into_model_data()
 
         for i in range(configprofileView.model().rowCount(QtCore.QModelIndex())):

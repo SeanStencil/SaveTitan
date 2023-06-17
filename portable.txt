@@ -1,0 +1,1 @@
+If you remove this file, SaveTitan will save to ..\AppData\Roaming\SaveTitan

@@ -21,7 +21,7 @@ from configparser import ConfigParser
 from xml.etree import ElementTree
 from datetime import datetime, timedelta
 from PyQt5 import QtWidgets, uic, QtCore
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem, QLabel, QCheckBox, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardItem
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
@@ -172,7 +172,7 @@ def io_global(read_write_mode, section=None, field=None, value=None):
         if config.has_option(section, field):
             return config.get(section, field)
         else:
-            raise KeyError(f"No such field '{field}' in section '{section}' in global.ini.")
+            return None  # Return None if field does not exist
 
     elif read_write_mode == "write":
         if not section or not field:
@@ -1028,7 +1028,7 @@ def show_config_dialog():
                 profile_data = io_savetitan("read", profile_id, "profile")
                 if not all(field in profile_data for field in required_fields):
                     with open("invalid_profiles.log", 'a') as f:
-                        f.write(f"{profile_id}: Missing required fields\n")
+                        f.write(f"{profile_id}: Profile is invalid\n")
                     return 2
                         
             except FileNotFoundError:
@@ -1421,9 +1421,8 @@ def show_config_dialog():
 
             self.ui = uic.loadUi("config_editor.ui", self)
             self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-            self.setFixedSize(self.size())
             
-            #self.ui.editor_tableView.setEnabled(False)
+            self.ui.editor_tableView.setEnabled(False)
 
             self.profile_id = profile_id
             
@@ -1651,6 +1650,45 @@ def show_config_dialog():
     dialog.show()        
 
 
+class RiskWarningDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Unstable Build Warning")
+        self.setFixedSize(400, 150)
+
+        self.label = QLabel("This is an unstable build of the program. Use at your own risk and always make personal backups of everything you point this at.", self)
+        self.label.setWordWrap(True)
+
+        self.checkbox = QCheckBox("I acknowledge the risk", self)
+        self.checkbox.stateChanged.connect(self.on_checkbox_state_changed)
+
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.setEnabled(False)
+        self.ok_button.clicked.connect(self.accept)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.label)
+        layout.addWidget(self.checkbox)
+        layout.addWidget(self.ok_button)
+
+    def on_checkbox_state_changed(self, state):
+        self.ok_button.setEnabled(state == Qt.Checked)
+
+    def closeEvent(self, event):
+        sys.exit(1)  # exits the application when you click "X"
+
+
+def show_risk_warning_if_needed():
+    risk_acknowledged = io_global("read", "config", "risk_acknowledged")
+    if risk_acknowledged is not None:
+        return
+
+    dialog = RiskWarningDialog()
+    if dialog.exec() == QDialog.Accepted:
+        io_global("write", "config", "risk_acknowledged", "1")
+
+
 # Parse command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-runprofile", help="Specify the game profile to be used")
@@ -1690,6 +1728,8 @@ elif args.runprofile:
         print("The specified game profile does not exist in profiles.ini")
         sys.exit(1)
     
+    show_risk_warning_if_needed()
+
     check_and_sync_saves(profile_id)
     
 elif args.runid:
@@ -1716,8 +1756,12 @@ elif args.runid:
 
     #Profile validity code to go here]
 
+    show_risk_warning_if_needed()
+
     check_and_sync_saves(profile_id)
 else:
+    show_risk_warning_if_needed()
+
     show_config_dialog()
     
 app.exec_()

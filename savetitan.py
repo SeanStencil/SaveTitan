@@ -90,25 +90,31 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
 
         if profile_id and section and field:
             config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
-            if not os.path.exists(config_file):
+            if not os.path.exists(config_file) or not check_permissions(config_file, "file", "read"):
                 return None
             config = ConfigParser()
             config.read(config_file)
             if config.has_option(section, field):
                 return config.get(section, field)
+            else:
+                return None
 
         elif profile_id and section:
             config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
-            if not os.path.exists(config_file):
+            if not os.path.exists(config_file) or not check_permissions(config_file, "file", "read"):
                 return None
             config = ConfigParser()
             config.read(config_file)
             if config.has_section(section):
                 return dict(config.items(section))
+            else:
+                return None
 
         elif section and field and value:
             matching_profiles = []
             for file in glob.glob(os.path.join(profiles_config_file, '*.ini')):
+                if not check_permissions(file, "file", "read"):
+                    continue
                 config = ConfigParser()
                 config.read(file)
                 file_id = os.path.splitext(os.path.basename(file))[0]
@@ -119,6 +125,8 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
         elif section:
             profiles_data = {}
             for file in glob.glob(os.path.join(profiles_config_file, '*.ini')):
+                if not check_permissions(file, "file", "read"):
+                    continue
                 config = ConfigParser()
                 config.read(file)
                 file_id = os.path.splitext(os.path.basename(file))[0]
@@ -134,8 +142,12 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
 
         config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
         config = ConfigParser()
+
         if os.path.exists(config_file):
+            if not check_permissions(config_file, "file", "write"):
+                raise PermissionError(f"Write permission denied for the file: {config_file}")
             config.read(config_file)
+
         if not config.has_section(section):
             config.add_section(section)
 
@@ -149,12 +161,11 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
 
         config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
         if os.path.exists(config_file):
+            if not check_permissions(config_file, "file", "write"): # Permission to delete a file is considered as write permission
+                raise PermissionError(f"Delete permission denied for the file: {config_file}")
             os.remove(config_file)
         else:
             raise FileNotFoundError(f"No profile found with ID: {profile_id}")
-
-    else:
-        raise ValueError("Invalid mode. Expected 'read', 'write', or 'delete'.")
 
  
 def io_global(read_write_mode, section=None, field=None, value=None):
@@ -225,8 +236,20 @@ def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=N
         
         with open(profile_info_path, 'w') as configfile:
             config.write(configfile)
+    
+    elif read_write_mode == "delete":
+        if not field:
+            raise ValueError("For delete operation, field is required.")
+        
+        if config.has_option(section, field):
+            config.remove_option(section, field)
+        
+            with open(profile_info_path, 'w') as configfile:
+                config.write(configfile)
+        else:
+            raise ValueError(f"No such field '{field}' in section '{section}'.")
     else:
-        raise ValueError("Invalid operation. Expected 'read' or 'write'.")
+        raise ValueError("Invalid operation. Expected 'read', 'write' or 'delete'.")
 
 
 # Checks for file mismatch
@@ -1673,7 +1696,7 @@ class RiskWarningDialog(QDialog):
         self.ok_button.setEnabled(state == Qt.Checked)
 
     def closeEvent(self, event):
-        sys.exit(1)  # exits the application when you click "X"
+        sys.exit(1)
 
 
 def show_risk_warning_if_needed():

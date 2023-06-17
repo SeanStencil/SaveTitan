@@ -163,24 +163,21 @@ def io_global(read_write_mode, section=None, field=None, value=None):
     field = str(field) if field is not None else None
     value = str(value) if value is not None else None
     config = ConfigParser()
+    config.read(global_config_file)
 
     if read_write_mode == "read":
         if not section or not field:
             raise ValueError("For 'read' mode, section and field must be specified.")
-
-        config.read(global_config_file)
         if config.has_option(section, field):
             return config.get(section, field)
         else:
-            return None  # Return None if field does not exist
-
+            return None
+        
     elif read_write_mode == "write":
         if not section or not field:
             raise ValueError("For 'write' mode, section and field must be specified.")
-
         if not config.has_section(section):
             config.add_section(section)
-
         config.set(section, field, value if value is not None else "")
         with open(global_config_file, "w") as file:
             config.write(file)

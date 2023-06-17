@@ -36,10 +36,10 @@ from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardIt
 from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
 
 
-# Generate a 8 character string for use for profile_id's
+# Generate a 6 character string for use for profile_id's
 def generate_id():
     characters = string.ascii_lowercase + string.digits
-    id_length = 8
+    id_length = 6
     random_id = ''.join(random.choices(characters, k=id_length))
     return random_id
 

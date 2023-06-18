@@ -560,9 +560,8 @@ def show_config_dialog():
         save_slot = io_profile("read", profile_id, "profile", "save_slot")
         save_slot_key = f"save{save_slot}"
 
-        save_slot_name = io_savetitan("read", profile_id, "profile", "saves", save_slot_key)
-        if save_slot_name:
-            save_mgmt_dialog.saveslotField.setText(save_slot_name)
+        save_slot_name = io_savetitan("read", profile_id, "saves", save_slot_key)
+        save_mgmt_dialog.saveslotField.setText(save_slot_name)
 
         center_dialog_over_dialog(QApplication.activeWindow(), save_mgmt_dialog)
 

@@ -11,7 +11,7 @@ import re
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem, QLabel, QCheckBox, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QUrl
+from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel, QUrl
 
 from modules.io import generate_id
 from modules.io import check_permissions
@@ -19,8 +19,8 @@ from modules.io import network_share_accessible
 from modules.io import io_profile
 from modules.io import io_global
 from modules.io import io_savetitan
-from modules.io import sync_save_cloud
-from modules.io import sync_save_local
+from modules.io import copy_save_to_cloud
+from modules.io import copy_save_to_local
 
 from modules.sync import check_and_sync_saves
 
@@ -278,7 +278,7 @@ def show_config_dialog():
                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
 
             if reply == QMessageBox.Yes:
-                sync_save_cloud(profile_id)
+                copy_save_to_cloud(profile_id)
 
             new_save_slot = selected_save_key.replace('save', '')
             
@@ -286,12 +286,11 @@ def show_config_dialog():
 
             save_mgmt_dialog.saveslotField.setText(selected_item.text())
 
-            sync_save_local(profile_id)
+            copy_save_to_local(profile_id)
 
             QMessageBox.information(None, "Load Finished", "The selected save has been loaded successfully.")
 
 
-        # Handle delete save button click
         def handle_delete_save_button():
             selected_items = save_mgmt_dialog.save_listWidget.selectedItems()
             if not selected_items:
@@ -299,6 +298,13 @@ def show_config_dialog():
 
             selected_item = selected_items[0]
             selected_save_key = selected_item.data(Qt.UserRole)
+
+            # Check if the save to be deleted is the one currently loaded
+            current_save_slot = io_profile("read", profile_id, "profile", "save_slot")
+            current_save_key = f"save{current_save_slot}"
+            if selected_save_key == current_save_key:
+                QMessageBox.warning(save_mgmt_dialog, "Delete Error", "You can't delete a save that is currently loaded.")
+                return
 
             confirm_msg = QMessageBox()
             confirm_msg.setIcon(QMessageBox.Question)
@@ -315,7 +321,7 @@ def show_config_dialog():
 
             list_item = save_mgmt_dialog.save_listWidget.takeItem(save_mgmt_dialog.save_listWidget.row(selected_item))
             del list_item
-                
+
 
         def handle_rename_save_button():
             selected_items = save_mgmt_dialog.save_listWidget.selectedItems()

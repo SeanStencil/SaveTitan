@@ -13,8 +13,8 @@ from modules.io import check_permissions
 from modules.io import io_profile
 from modules.io import io_global
 from modules.io import io_savetitan
-from modules.io import sync_save_cloud
-from modules.io import sync_save_local
+from modules.io import copy_save_to_cloud
+from modules.io import copy_save_to_local
 
 import modules.paths as paths
 profiles_config_file = paths.profiles_config_file
@@ -91,7 +91,7 @@ def check_and_sync_saves(profile_id):
                 
             # Result: More cloud files than local - Action: Copy contents of cloud folder to local
             elif cloud_files_count > local_files_count:
-                sync_save_local(profile_id)
+                copy_save_to_local(profile_id)
                 launch_game(profile_id)
                 
             # Result: Content and amount of files is identical - Action: Launch the game, upload when done
@@ -143,7 +143,7 @@ def check_and_sync_saves(profile_id):
                 io_savetitan("write", profile_id, "profile", "checkout", None)
                 sys.exit()
 
-            sync_diag.downloadButton.clicked.connect(lambda: [sync_save_local(profile_id), launch_game(profile_id), sync_diag.accept()])
+            sync_diag.downloadButton.clicked.connect(lambda: [copy_save_to_local(profile_id), launch_game(profile_id), sync_diag.accept()])
             sync_diag.uploadButton.clicked.connect(lambda: [launch_game(profile_id), sync_diag.accept()])
             sync_diag.nosyncButton.clicked.connect(lambda: [on_nosyncButton_clicked()])
 
@@ -177,7 +177,7 @@ def launch_game(profile_id):
         message_box.exec_()
 
         if message_box.clickedButton() == done_button:
-            sync_save_cloud(profile_id)
+            copy_save_to_cloud(profile_id)
 
         io_savetitan("write", profile_id, "profile", "checkout")
 

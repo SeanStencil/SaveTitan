@@ -258,7 +258,7 @@ def check_folder_mismatch(folder_a, folder_b):
 
 
 # Function to sync saves (Copy local saves to cloud storage)
-def sync_save_cloud(profile_id):
+def copy_save_to_cloud(profile_id):
     local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     save_slot = io_profile("read", profile_id, "profile", "save_slot")
@@ -291,7 +291,7 @@ def sync_save_cloud(profile_id):
 
 
 # Function to sync saves (Copy cloud saves to local storage)
-def sync_save_local(profile_id):
+def copy_save_to_local(profile_id):
     local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     save_slot = io_profile("read", profile_id, "profile", "save_slot")

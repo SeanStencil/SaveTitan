@@ -1,15 +1,25 @@
 import os
-import sys
 import glob
+import string
+import random
+import filecmp
+import shutil
 import configparser
 
 from configparser import ConfigParser
 from PyQt5.QtWidgets import QMessageBox
 
 import modules.paths as paths
-
 profiles_config_file = paths.profiles_config_file
 global_config_file = paths.global_config_file
+
+
+# Generate a 6 character string for use for profile_id's
+def generate_id():
+    characters = string.ascii_lowercase + string.digits
+    id_length = 6
+    random_id = ''.join(random.choices(characters, k=id_length))
+    return random_id
 
 
 # Check a function's ability to perform the given action (read, write, execute) on the file/folder path
@@ -224,3 +234,145 @@ def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=N
             raise ValueError(f"No such field '{field}' in section '{section}'.")
     else:
         raise ValueError("Invalid operation. Expected 'read', 'write' or 'delete'.")
+    
+
+    # Checks for file mismatch
+def check_folder_mismatch(folder_a, folder_b):
+    comparison = filecmp.dircmp(folder_a, folder_b)
+
+    def compare_dirs(comp):
+        if comp.diff_files or comp.left_only or comp.right_only or comp.funny_files:
+            return True
+
+        match, mismatch, errors = filecmp.cmpfiles(comp.left, comp.right, comp.common_files, shallow=False)
+        if mismatch or errors:
+            return True
+
+        for subcomp in comp.subdirs.values():
+            if compare_dirs(subcomp):
+                return True
+
+        return False
+
+    return compare_dirs(comparison)
+
+
+# Function to sync saves (Copy local saves to cloud storage)
+def sync_save_cloud(profile_id):
+    local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
+    cloud_storage_path = io_global("read", "config", "cloud_storage_path")
+    save_slot = io_profile("read", profile_id, "profile", "save_slot")
+
+    cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
+
+    if not network_share_accessible():
+        return
+        
+    while True:
+        try:
+            os.makedirs(cloud_profile_save_path, exist_ok=True)
+            
+            make_backup_copy(profile_id, "cloud_backup")
+            
+            shutil.rmtree(cloud_profile_save_path)
+            shutil.copytree(local_save_folder, cloud_profile_save_path)
+            
+            if check_folder_mismatch(local_save_folder, cloud_profile_save_path):
+                raise Exception("Mismatch in directory contents")
+            else:
+                print("Sync completed successfully.")
+                break
+        except Exception as e:
+            reply = QMessageBox.critical(None, "Sync Error",
+                                         f"An error occurred during the sync process: {str(e)}",
+                                         QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+            if reply != QMessageBox.Retry:
+                break
+
+
+# Function to sync saves (Copy cloud saves to local storage)
+def sync_save_local(profile_id):
+    local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
+    cloud_storage_path = io_global("read", "config", "cloud_storage_path")
+    save_slot = io_profile("read", profile_id, "profile", "save_slot")
+    cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
+
+    if not network_share_accessible():
+        return
+
+    while True:
+        try:
+            os.makedirs(local_save_folder, exist_ok=True)
+
+            make_backup_copy(profile_id, "local_backup")
+
+            shutil.rmtree(local_save_folder)
+            shutil.copytree(cloud_profile_save_path, local_save_folder)
+
+            if check_folder_mismatch(cloud_profile_save_path, local_save_folder):
+                raise Exception("Mismatch in directory contents")
+            else:
+                print("Sync completed successfully.")
+                break
+        except Exception as e:
+            reply = QMessageBox.critical(None, "Sync Error",
+                                         f"An error occurred during the sync process: {str(e)}",
+                                         QMessageBox.Retry | QMessageBox.Abort, QMessageBox.Retry)
+            if reply != QMessageBox.Retry:
+                break
+
+
+# Perform backup function prior to sync
+def make_backup_copy(profile_id, which_side):
+    cloud_storage_path = io_global("read", "config", "cloud_storage_path")
+    save_slot = io_profile("read", profile_id, "profile", "save_slot")
+    cloud_profile_folder_save = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
+    cloud_profile_folder_save_bak = cloud_profile_folder_save + ".bak"
+
+    if which_side not in ["local_backup", "cloud_backup"]:
+        raise Exception("Invalid which_side argument")
+
+    os.makedirs(cloud_profile_folder_save_bak, exist_ok=True)
+
+    if which_side == "local_backup":
+        local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
+        
+        if os.path.exists(cloud_profile_folder_save_bak):
+            shutil.rmtree(cloud_profile_folder_save_bak)
+
+        shutil.copytree(local_save_folder, cloud_profile_folder_save_bak)
+
+    elif which_side == "cloud_backup":
+        if os.path.exists(cloud_profile_folder_save_bak):
+            shutil.rmtree(cloud_profile_folder_save_bak)
+
+        shutil.copytree(cloud_profile_folder_save, cloud_profile_folder_save_bak)
+
+
+def export_profile_info(profile_name, profile_id, sync_mode, executable_name):
+    if not network_share_accessible():
+        QMessageBox.critical(None, "Add Profile Aborted",
+                             "The network location is not accessible, the process to add the profile has been aborted.")
+        return
+
+    cloud_storage_path = io_global("read", "config", "cloud_storage_path")
+    folder_path = os.path.join(cloud_storage_path, profile_id)
+
+    os.makedirs(folder_path, exist_ok=True)
+
+    save1_folder_path = os.path.join(folder_path, 'save1')
+    os.makedirs(save1_folder_path, exist_ok=True)
+
+    profile_info_fields = [
+        ("name", profile_name),
+        ("save_slot", "1"),
+        ("saves", "1"),
+        ("sync_mode", sync_mode),
+        ("executable_name", executable_name),
+        ("checkout", "")
+    ]
+
+    for field, value in profile_info_fields:
+        io_savetitan("write", profile_id, "profile", field, value)
+
+    io_savetitan("write", profile_id, "saves", "save1", "Save 1")

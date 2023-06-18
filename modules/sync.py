@@ -135,12 +135,12 @@ def check_and_sync_saves(profile_id):
                 sync_diag.cloud_indication.setText("Cloud Copy: Older")
 
             def on_nosyncButton_clicked():
-                launch_game_without_sync(profile_id)
-                io_savetitan("write", profile_id, "profile", "checkout", None)
-                sync_diag.accept()
+                executable_path = io_profile("read", profile_id, "profile", "game_executable")
+                io_savetitan("write", profile_id, "profile", "checkout")
+                launch_game_without_sync(executable_path)
             
             def on_rejected_connect():
-                io_savetitan("write", profile_id, "profile", "checkout", None)
+                io_savetitan("write", profile_id, "profile", "checkout")
                 sys.exit()
 
             sync_diag.downloadButton.clicked.connect(lambda: [copy_save_to_local(profile_id), launch_game(profile_id), sync_diag.accept()])
@@ -185,15 +185,12 @@ def launch_game(profile_id):
 
 
 # Function to launch the game without sync
-def launch_game_without_sync(game_executable):
+def launch_game_without_sync(executable_path):
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-
-    game_executable = io_profile("read", profile_id, "profile", "game_executable")
-    profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
     
-    if not check_permissions(game_executable, 'game executable', "execute"):
+    if not check_permissions(executable_path, 'game executable', "execute"):
         return
 
-    subprocess.Popen(game_executable)
+    subprocess.Popen(executable_path)
     
     sys.exit()

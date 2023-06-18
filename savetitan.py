@@ -15,14 +15,16 @@ from PyQt5.QtCore import Qt, QTimer, QAbstractTableModel, QModelIndex, QSortFilt
 
 from modules.io import generate_id
 from modules.io import check_permissions
+from modules.io import network_share_accessible
 from modules.io import io_profile
 from modules.io import io_global
 from modules.io import io_savetitan
 from modules.io import sync_save_cloud
 from modules.io import sync_save_local
-from modules.io import export_profile_info
 
 from modules.sync import check_and_sync_saves
+
+from modules.misc import center_dialog_over_dialog
 
 import modules.io as io
 import modules.sync as io
@@ -31,69 +33,56 @@ profiles_config_file = paths.profiles_config_file
 global_config_file = paths.global_config_file
 
 
-# Function to set the cloud storage location
-def set_cloud_storage_path():
-    current_cloud_storage_path = io_global("read", "config", "cloud_storage_path") or ""
-    if not os.path.isdir(current_cloud_storage_path):
-        current_cloud_storage_path = ""
-
-    while True:
-        cloud_storage_path = QFileDialog.getExistingDirectory(None, "Select Cloud Storage Path", current_cloud_storage_path)
-        if not cloud_storage_path:
-            break
-
-        if not os.path.exists(cloud_storage_path):
-            QMessageBox.warning(None, "Invalid Path",
-                                "The selected path does not exist. Please select another path.")
-            continue
-
-        subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
-        savetitan_files_found = False
-        for subfolder in subfolders:
-            savetitan_files = glob.glob(os.path.join(subfolder, "*.savetitan"))
-            if len(savetitan_files) > 0:
-                savetitan_files_found = True
-                break
-
-        if savetitan_files_found:
-            QMessageBox.information(None, "Existing SaveTitan Cloud Folder Detected",
-                                    "This appears to be an existing SaveTitan cloud folder. "
-                                    "Make sure to use the 'Import' button to import existing profiles.")
-        elif not savetitan_files_found and len(os.listdir(cloud_storage_path)) > 0:
-            response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
-                                           "WARNING: The selected cloud storage path is not empty. "
-                                           "Would you like to create a new SaveTitan directory in it?",
-                                           QMessageBox.Yes | QMessageBox.No)
-            if response == QMessageBox.Yes:
-                cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
-                os.makedirs(cloud_storage_path, exist_ok=True)
-            else:
-                continue
-
-        io_global("write", "config", "cloud_storage_path", cloud_storage_path)
-        break
-
-    dialog.addButton.setEnabled(True)
-    dialog.importButton.setEnabled(True)
-
-
-# Calculate the center position over another dialog window
-def center_dialog_over_dialog(first_dialog, second_dialog):
-    def move_second_dialog_to_center():
-        first_dialog_size = first_dialog.size()
-        first_dialog_loc = first_dialog.pos()
-
-        second_dialog_size = second_dialog.frameGeometry()
-        x = int(first_dialog_loc.x() + (first_dialog_size.width() - second_dialog_size.width()) / 2)
-        y = int(first_dialog_loc.y() + (first_dialog_size.height() - second_dialog_size.height()) / 2)
-
-        second_dialog.move(x, y)
-
-    QTimer.singleShot(0, move_second_dialog_to_center)
-
-
 # Function to show config dialog
 def show_config_dialog():
+
+
+    # Function to set the cloud storage location
+    def set_cloud_storage_path():
+        current_cloud_storage_path = io_global("read", "config", "cloud_storage_path") or ""
+        if not os.path.isdir(current_cloud_storage_path):
+            current_cloud_storage_path = ""
+
+        while True:
+            cloud_storage_path = QFileDialog.getExistingDirectory(None, "Select Cloud Storage Path", current_cloud_storage_path)
+            if not cloud_storage_path:
+                break
+
+            if not os.path.exists(cloud_storage_path):
+                QMessageBox.warning(None, "Invalid Path",
+                                    "The selected path does not exist. Please select another path.")
+                continue
+
+            subfolders = [f.path for f in os.scandir(cloud_storage_path) if f.is_dir()]
+            savetitan_files_found = False
+            for subfolder in subfolders:
+                savetitan_files = glob.glob(os.path.join(subfolder, "*.savetitan"))
+                if len(savetitan_files) > 0:
+                    savetitan_files_found = True
+                    break
+
+            if savetitan_files_found:
+                QMessageBox.information(None, "Existing SaveTitan Cloud Folder Detected",
+                                        "This appears to be an existing SaveTitan cloud folder. "
+                                        "Make sure to use the 'Import' button to import existing profiles.")
+            elif not savetitan_files_found and len(os.listdir(cloud_storage_path)) > 0:
+                response = QMessageBox.warning(None, "Non-Empty Cloud Storage Path",
+                                            "WARNING: The selected cloud storage path is not empty. "
+                                            "Would you like to create a new SaveTitan directory in it?",
+                                            QMessageBox.Yes | QMessageBox.No)
+                if response == QMessageBox.Yes:
+                    cloud_storage_path = os.path.join(cloud_storage_path, "SaveTitan")
+                    os.makedirs(cloud_storage_path, exist_ok=True)
+                else:
+                    continue
+
+            io_global("write", "config", "cloud_storage_path", cloud_storage_path)
+            break
+
+        dialog.addButton.setEnabled(True)
+        dialog.importButton.setEnabled(True)
+
+
     global dialog
 
     dialog = uic.loadUi("ui/config.ui")
@@ -351,6 +340,7 @@ def show_config_dialog():
 
             selected_item.setText(new_save_name)
 
+
         save_mgmt_dialog.newsaveButton.clicked.connect(handle_new_save_button)
         save_mgmt_dialog.loadsaveButton.clicked.connect(handle_load_save_button)
         save_mgmt_dialog.renamesaveButton.clicked.connect(handle_rename_save_button)
@@ -423,6 +413,34 @@ def show_config_dialog():
 
             profile_folder = os.path.join(cloud_storage_path, profile_id)
             os.makedirs(profile_folder, exist_ok=True)
+
+            def export_profile_info(profile_name, profile_id, sync_mode, executable_name):
+                if not network_share_accessible():
+                    QMessageBox.critical(None, "Add Profile Aborted",
+                                        "The network location is not accessible, the process to add the profile has been aborted.")
+                    return
+
+                cloud_storage_path = io_global("read", "config", "cloud_storage_path")
+                folder_path = os.path.join(cloud_storage_path, profile_id)
+
+                os.makedirs(folder_path, exist_ok=True)
+
+                save1_folder_path = os.path.join(folder_path, 'save1')
+                os.makedirs(save1_folder_path, exist_ok=True)
+
+                profile_info_fields = [
+                    ("name", profile_name),
+                    ("save_slot", "1"),
+                    ("saves", "1"),
+                    ("sync_mode", sync_mode),
+                    ("executable_name", executable_name),
+                    ("checkout", "")
+                ]
+
+                for field, value in profile_info_fields:
+                    io_savetitan("write", profile_id, "profile", field, value)
+
+                io_savetitan("write", profile_id, "saves", "save1", "Save 1")
 
             export_profile_info(profile_name, profile_id, sync_mode, os.path.basename(game_executable))
 

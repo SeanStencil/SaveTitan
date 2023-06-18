@@ -347,32 +347,3 @@ def make_backup_copy(profile_id, which_side):
             shutil.rmtree(cloud_profile_folder_save_bak)
 
         shutil.copytree(cloud_profile_folder_save, cloud_profile_folder_save_bak)
-
-
-def export_profile_info(profile_name, profile_id, sync_mode, executable_name):
-    if not network_share_accessible():
-        QMessageBox.critical(None, "Add Profile Aborted",
-                             "The network location is not accessible, the process to add the profile has been aborted.")
-        return
-
-    cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-    folder_path = os.path.join(cloud_storage_path, profile_id)
-
-    os.makedirs(folder_path, exist_ok=True)
-
-    save1_folder_path = os.path.join(folder_path, 'save1')
-    os.makedirs(save1_folder_path, exist_ok=True)
-
-    profile_info_fields = [
-        ("name", profile_name),
-        ("save_slot", "1"),
-        ("saves", "1"),
-        ("sync_mode", sync_mode),
-        ("executable_name", executable_name),
-        ("checkout", "")
-    ]
-
-    for field, value in profile_info_fields:
-        io_savetitan("write", profile_id, "profile", field, value)
-
-    io_savetitan("write", profile_id, "saves", "save1", "Save 1")

@@ -189,7 +189,7 @@ def launch_game_without_sync(game_executable):
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
 
     game_executable = io_profile("read", profile_id, "profile", "game_executable")
-    profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "/profile_into.savetitan")
+    profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id + "profile_into.savetitan")
     
     if not check_permissions(game_executable, 'game executable', "execute"):
         return

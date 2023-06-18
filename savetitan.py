@@ -11,7 +11,7 @@ import re
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem, QLabel, QCheckBox, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel, QUrl
+from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel, QUrl, QRegExp
 
 from modules.io import generate_id
 from modules.io import check_permissions
@@ -29,7 +29,7 @@ from modules.misc import center_dialog_over_dialog
 import modules.io as io
 import modules.sync as io
 import modules.paths as paths
-profiles_config_file = paths.profiles_config_file
+user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 
 
@@ -358,11 +358,8 @@ def show_config_dialog():
     # Function to add a profile
     def add_profile():
         cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-        if not cloud_storage_path:
-            QMessageBox.warning(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured. Please configure it.")
-            return
-
-        if not os.path.exists(cloud_storage_path):
+        if not cloud_storage_path or not os.path.exists(cloud_storage_path):
+            QMessageBox.warning(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured or invalid. Please configure it.")
             return
 
         config_dialog = QApplication.activeWindow()
@@ -503,11 +500,8 @@ def show_config_dialog():
     def import_profile_dialog():
         cloud_storage_path = io_global("read", "config", "cloud_storage_path")
 
-        if not cloud_storage_path:
-            QMessageBox.warning(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured. Please configure it.")
-            return
-
-        if not os.path.exists(cloud_storage_path):
+        if not cloud_storage_path or not os.path.exists(cloud_storage_path):
+            QMessageBox.warning(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured or invalid. Please configure it.")
             return
 
         import_profile_dialog = uic.loadUi("ui/import_profile.ui")
@@ -691,7 +685,78 @@ def show_config_dialog():
         import_profile_dialog.listWidget.currentItemChanged.connect(lambda: import_profile_dialog.importButton.setEnabled(True if import_profile_dialog.listWidget.currentItem() else False))
 
         import_profile_dialog.exec_()
-       
+
+
+    def omit_files_dialog(profile_id):
+        cloud_storage_path = io_global("read", "config", "cloud_storage_path")
+        local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
+
+        if not cloud_storage_path or not os.path.exists(cloud_storage_path):
+            QMessageBox.warning(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured or invalid. Please configure it.")
+            return
+
+        omit_files_dialog = uic.loadUi("ui/list_dialog.ui")
+        omit_files_dialog.setWindowFlags(omit_files_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
+        omit_files_dialog.setFixedSize(omit_files_dialog.size())
+
+        center_dialog_over_dialog(dialog, omit_files_dialog)
+
+        omit_files_dialog.listWidget.setEnabled(False)
+
+        omitted_files = io_profile("read", profile_id, "overrides", "omitted")
+        omitted_files = omitted_files.split(",") if omitted_files else []
+
+        for file_path in omitted_files:
+            omit_files_dialog.listWidget.addItem(file_path)
+
+        if len(omitted_files) > 0:
+            omit_files_dialog.listWidget.setEnabled(True)
+
+        def omit_files_add_file():
+            file_dialog = QFileDialog()
+            file_path, _ = file_dialog.getOpenFileName(directory=local_save_folder)
+
+            if file_path:
+                file_path = os.path.normpath(os.path.abspath(file_path))
+                local_folder_path = os.path.normpath(os.path.abspath(local_save_folder))
+
+                if os.path.commonpath([local_folder_path, file_path]) == local_folder_path:
+                    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
+                    omitted_files = omitted_files.split(",") if omitted_files else []
+                    omitted_files.append(file_path)
+
+                    io_profile("write", profile_id, "overrides", "omitted", ",".join(omitted_files))
+                    omit_files_dialog.listWidget.setEnabled(True)
+                    omit_files_dialog.listWidget.addItem(file_path)
+                else:
+                    QMessageBox.warning(None, "Invalid Path", "Selected file should be within the local save folder.")
+
+
+        def omit_files_remove_file():
+            selected_item = omit_files_dialog.listWidget.currentItem()
+
+            if selected_item:
+                confirm_msg = QMessageBox.question(None, "Confirmation", "Do you want to remove the file from omitted files?", QMessageBox.Yes | QMessageBox.No)
+                
+                if confirm_msg == QMessageBox.Yes:
+                    selected_file = selected_item.text()
+                    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
+                    omitted_files = omitted_files.split(",") if omitted_files else []
+
+                    if selected_file in omitted_files:
+                        omitted_files.remove(selected_file)
+                        io_profile("write", profile_id, "overrides", "omitted", ",".join(omitted_files))
+                        omit_files_dialog.listWidget.takeItem(omit_files_dialog.listWidget.row(selected_item))
+                        if len(omitted_files) == 0:
+                            omit_files_dialog.listWidget.setEnabled(False)
+
+
+        omit_files_dialog.addButton.clicked.connect(omit_files_add_file)
+        omit_files_dialog.removeButton.clicked.connect(omit_files_remove_file)
+        omit_files_dialog.closeButton.clicked.connect(omit_files_dialog.close)
+
+        omit_files_dialog.exec_()
+
        
     # Show the about dialog window
     def about_dialog(config_dialog):
@@ -891,12 +956,12 @@ def show_config_dialog():
     def context_menu(point):
         menu = QMenu()
 
-        open_cloud_storage_action = QAction("Open Cloud Storage", menu)
         open_local_save_action = QAction("Open Local Save", menu)
-        delete_profile_action = QAction("Delete Profile", menu)
+        open_cloud_storage_action = QAction("Open Cloud Storage", menu)
+        omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
         open_save_mgmt_action = QAction("Open Save Manager", menu)
         open_save_editor_action = QAction("Open Config Editor", menu)
-        open_save_editor_action.setEnabled(False)
+        delete_profile_action = QAction("Delete Profile", menu)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
 
         index = configprofileView.indexAt(point)
@@ -904,15 +969,19 @@ def show_config_dialog():
         if index.isValid():
             selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][2]
 
-            open_cloud_storage_action.triggered.connect(lambda: open_cloud_location_storage(selected_profile_id))
             open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
-            delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
+            open_cloud_storage_action.triggered.connect(lambda: open_cloud_location_storage(selected_profile_id))
+            omit_files_from_sync_action.triggered.connect(lambda: omit_files_dialog(selected_profile_id))
             open_save_mgmt_action.triggered.connect(lambda: save_mgmt_dialog(selected_profile_id))
             open_save_editor_action.triggered.connect(lambda: ConfigEditorDialog(selected_profile_id).exec_())
+            open_save_editor_action.setEnabled(True)
+            delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
             copy_profile_id_action.triggered.connect(lambda: QApplication.clipboard().setText(selected_profile_id))
 
             menu.addAction(open_local_save_action)
             menu.addAction(open_cloud_storage_action)
+            menu.addSeparator()
+            menu.addAction(omit_files_from_sync_action)
             menu.addSeparator()
             menu.addAction(open_save_mgmt_action)
             menu.addAction(open_save_editor_action)
@@ -952,7 +1021,22 @@ def show_config_dialog():
             self.populate_file_combo_box()
 
             self.table_model = QStandardItemModel()
-            self.editor_table_view.setModel(self.table_model)
+            self.proxy_model = QSortFilterProxyModel()
+            self.proxy_model.setSourceModel(self.table_model)
+            self.editor_table_view.setModel(self.proxy_model)
+            self.editor_table_view.verticalHeader().setVisible(False)
+
+            self.file_combo_box.currentIndexChanged.connect(self.populate_section_combo_box)
+            self.section_combo_box.currentIndexChanged.connect(self.populate_table_view)
+
+            self.filter_edit_box.textChanged.connect(self.update_filter)
+
+            self.populate_table_view()
+
+        def update_filter(self, text):
+            search = QRegExp(text, Qt.CaseInsensitive, QRegExp.FixedString)
+            self.proxy_model.setFilterRegExp(search)
+            self.editor_table_view.viewport().update()
 
             self.editor_table_view.verticalHeader().setVisible(False)
 
@@ -1004,8 +1088,8 @@ def show_config_dialog():
 
             self.file_combo_box.clear()
             self.file_combo_box.addItems(["Files"] + file_paths)
-            
-            
+
+
         def populate_section_combo_box(self):
             file_path = self.file_combo_box.currentText()
 
@@ -1035,9 +1119,7 @@ def show_config_dialog():
                 return
 
             self.table_model.clear()
-
             self.table_model.setHorizontalHeaderLabels(["Field", "Value"])
-
             self.editor_table_view.resizeRowsToContents()
 
             file_format = self.file_formats.get(file_path)
@@ -1050,8 +1132,6 @@ def show_config_dialog():
                     self.ui.editor_tableView.setEnabled(True)
                     for key, value in config.items(section):
                         self.add_row_to_table(key, value)
-                        self.editor_table_view.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-                        self.editor_table_view.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
             elif file_format == '.json':
                 with open(file_path, 'r') as f:
@@ -1091,8 +1171,7 @@ def show_config_dialog():
         def save_changes(self):
             file_path = self.file_combo_box.currentText()
 
-            cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-            backup_folder_path = os.path.join(cloud_storage_path, str(self.profile_id), "config_backup")
+            backup_folder_path = os.path.join(user_config_file, "config_backup", str(self.profile_id))
 
             hostname = socket.gethostname()
 
@@ -1107,13 +1186,32 @@ def show_config_dialog():
             if not os.path.exists(backup_file_path):
                 shutil.copy2(file_path, backup_file_path)
 
+
+            def recursive_update(json_data, keys, value):
+                key = keys.pop(0)
+                if keys:
+                    if key not in json_data:
+                        json_data[key] = {}
+                    recursive_update(json_data[key], keys, value)
+                else:
+                    json_data[key] = value
+
+
             file_format = self.file_formats.get(file_path)
             if file_format == '.ini':
                 config = configparser.ConfigParser()
+                config.read(file_path)
+                
+                section = self.section_combo_box.currentText()
+
                 for row in range(self.table_model.rowCount()):
                     key = self.table_model.item(row, 0).text()
                     value = self.table_model.item(row, 1).text()
-                    config.set('DEFAULT', key, value)
+
+                    if not config.has_section(section):
+                        config.add_section(section)
+                    
+                    config.set(section, key, value)
 
                 with open(file_path, 'w') as file:
                     config.write(file)
@@ -1125,13 +1223,29 @@ def show_config_dialog():
                     section = self.section_combo_box.currentText() + '/'
                     for row in range(self.table_model.rowCount()):
                         key = self.table_model.item(row, 0).text()
-                        value = self.table_model.item(row, 1).text()
+                        value_text = self.table_model.item(row, 1).text()
                         complete_key = section + key
                         if complete_key in flattened_data:
+                            original_value = flattened_data[complete_key]
                             keys = complete_key.split('/')
                             sub_data = data
                             for sub_key in keys[:-1]:
                                 sub_data = sub_data[sub_key]
+                            
+                            if isinstance(original_value, (int, float)):
+                                try:
+                                    value = float(value_text)
+                                    if value.is_integer():
+                                        value = int(value)
+                                except ValueError:
+                                    msgBox = QMessageBox()
+                                    msgBox.setWindowTitle("Input Error")
+                                    msgBox.setText(f"Invalid input for field {key}. This field requires a numerical value.")
+                                    msgBox.exec_()
+                                    return
+                            else:
+                                value = value_text
+                            
                             sub_data[keys[-1]] = value
 
                 with open(file_path, 'w') as f:
@@ -1139,7 +1253,7 @@ def show_config_dialog():
                     
             msgBox = QMessageBox()
             msgBox.setWindowTitle("Config File Saved")
-            msgBox.setText(f"The configuration file has been saved successfully.\n\nA backup of the original file has been stored at:\n{backup_file_path}")
+            msgBox.setText(f"The configuration file has been saved successfully.\n\nThe original version prior to any changes made here is stored:\n{backup_file_path}")
             msgBox.exec_()
 
         def save_changes_and_close(self):
@@ -1156,7 +1270,7 @@ def show_config_dialog():
     dialog.actionExit.triggered.connect(dialog.close)
     dialog.actionAbout.triggered.connect(lambda: about_dialog(dialog))
 
-    dialog.show()        
+    dialog.show()
 
 
 class RiskWarningDialog(QDialog):
@@ -1166,7 +1280,7 @@ class RiskWarningDialog(QDialog):
         self.setWindowTitle("Unstable Build Warning")
         self.setFixedSize(400, 150)
 
-        self.label = QLabel("This is an unstable build of the program. Use at your own risk and always make personal backups of everything you point this at.", self)
+        self.label = QLabel("This is an unstable build of the program which is likely to be broken in many ways. Use at your own risk and always make personal backups of everything you point this at.", self)
         self.label.setWordWrap(True)
 
         self.checkbox = QCheckBox("I acknowledge the risk", self)
@@ -1244,6 +1358,9 @@ elif args.runprofile:
 elif args.runid:
     if not cloud_storage_path:
         print("Cloud storage path is not configured. Run the script without a parameter to run the first-time setup")
+        sys.exit(1)
+    if not os.path.exists(cloud_storage_path):
+        print("Cloud storage path is invalid. Run the configuration tool to fix.")
         sys.exit(1)
 
     profile_id = args.runid

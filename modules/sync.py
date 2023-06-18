@@ -5,6 +5,8 @@ from datetime import datetime
 import socket
 import subprocess
 
+from pathlib import Path
+
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QTimer
 from PyQt5 import uic
@@ -17,7 +19,7 @@ from modules.io import copy_save_to_cloud
 from modules.io import copy_save_to_local
 
 import modules.paths as paths
-profiles_config_file = paths.profiles_config_file
+user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 
 
@@ -33,6 +35,9 @@ def check_and_sync_saves(profile_id):
     local_save_folder = profile_fields.get("local_save_folder")
     save_slot = profile_fields.get("save_slot")
     sync_mode = profile_fields.get("sync_mode")
+
+    # Read omitted files
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
 
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id, "save" + save_slot)
 
@@ -69,6 +74,12 @@ def check_and_sync_saves(profile_id):
         for dirpath, dirnames, filenames in os.walk(local_save_folder):
             for filename in filenames:
                 local_file = os.path.join(dirpath, filename)
+
+                # Check: Skip omitted files
+                local_file = str(Path(local_file))
+                if local_file in omitted_files:
+                    continue
+
                 cloud_file = os.path.join(cloud_profile_save_path, os.path.relpath(local_file, local_save_folder))
                 if os.path.exists(cloud_file):
                     if not filecmp.cmp(local_file, cloud_file, shallow=False):
@@ -105,6 +116,13 @@ def check_and_sync_saves(profile_id):
 
             for dirpath, dirnames, filenames in os.walk(local_save_folder):
                 for filename in filenames:
+                    local_file = os.path.join(dirpath, filename)
+
+                    # Check: Skip omitted files                    
+                    local_file = str(Path(local_file))
+                    if local_file in omitted_files:
+                        continue
+
                     file_time = datetime.fromtimestamp(os.path.getmtime(os.path.join(dirpath, filename)))
                     if local_file_time < file_time:
                         local_file_time = file_time
@@ -118,7 +136,6 @@ def check_and_sync_saves(profile_id):
             local_save_time_str = local_file_time.strftime("%B %d, %Y, %I:%M:%S %p")
             cloud_save_time_str = cloud_file_time.strftime("%B %d, %Y, %I:%M:%S %p")
 
-            # Draw sync dialog
             sync_diag = uic.loadUi("ui/sync_diag.ui")
             sync_diag.local_date.setText(local_save_time_str)
             sync_diag.cloud_date.setText(cloud_save_time_str)

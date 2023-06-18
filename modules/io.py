@@ -6,11 +6,13 @@ import filecmp
 import shutil
 import configparser
 
+from pathlib import Path
+
 from configparser import ConfigParser
 from PyQt5.QtWidgets import QMessageBox
 
 import modules.paths as paths
-profiles_config_file = paths.profiles_config_file
+user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 
 
@@ -48,7 +50,7 @@ def network_share_accessible():
         QMessageBox.critical(None, "Cloud Storage Path Not Found", "Cloud storage path is not configured. Please configure it.")
         return False
 
-    cloud_storage_path = cloud_storage_path.replace("\\", "\\\\")
+    #cloud_storage_path = cloud_storage_path.replace("\\", "\\\\")
 
     if check_permissions(cloud_storage_path, 'cloud storage', "read"):
         return True
@@ -68,7 +70,8 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
     if read_write_mode == "read":
 
         if profile_id and section and field:
-            config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
+            config_file = os.path.join(user_config_file, "profiles", f"{profile_id}.ini")
+
             if not os.path.exists(config_file) or not check_permissions(config_file, "file", "read"):
                 return None
             config = ConfigParser()
@@ -79,7 +82,7 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
                 return None
 
         elif profile_id and section:
-            config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
+            config_file = os.path.join(user_config_file, "profiles", f"{profile_id}.ini")
             if not os.path.exists(config_file) or not check_permissions(config_file, "file", "read"):
                 return None
             config = ConfigParser()
@@ -91,7 +94,7 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
 
         elif section and field and value:
             matching_profiles = []
-            for file in glob.glob(os.path.join(profiles_config_file, '*.ini')):
+            for file in glob.glob(os.path.join(user_config_file, "profiles", '*.ini')):
                 if not check_permissions(file, "file", "read"):
                     continue
                 config = ConfigParser()
@@ -103,7 +106,7 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
 
         elif section:
             profiles_data = {}
-            for file in glob.glob(os.path.join(profiles_config_file, '*.ini')):
+            for file in glob.glob(os.path.join(user_config_file, "profiles", '*.ini')):
                 if not check_permissions(file, "file", "read"):
                     continue
                 config = ConfigParser()
@@ -113,15 +116,15 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
                     profiles_data[file_id] = dict(config.items(section))
             return profiles_data
         else:
-            return [os.path.splitext(os.path.basename(file))[0] for file in glob.glob(os.path.join(profiles_config_file, '*.ini'))]
+            return [os.path.splitext(os.path.basename(file))[0] for file in glob.glob(os.path.join(user_config_file, "profiles", '*.ini'))]
 
     elif read_write_mode == "write":
         if not profile_id or not section or not field:
             raise ValueError("For 'write' mode, profile_id, section, and field must be specified.")
         
-        os.makedirs(profiles_config_file, exist_ok=True)
+        os.makedirs(os.path.join(user_config_file, "profiles"), exist_ok=True)
         
-        config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
+        config_file = os.path.join(user_config_file, "profiles", f"{profile_id}.ini")
         config = ConfigParser()
 
         if os.path.exists(config_file):
@@ -140,9 +143,9 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
         if not profile_id:
             raise ValueError("For 'delete' mode, profile_id must be specified.")
 
-        config_file = os.path.join(profiles_config_file, f"{profile_id}.ini")
+        config_file = os.path.join(user_config_file, "profiles", f"{profile_id}.ini")
         if os.path.exists(config_file):
-            if not check_permissions(config_file, "file", "write"): # Permission to delete a file is considered as write permission
+            if not check_permissions(config_file, "file", "write"):
                 raise PermissionError(f"Delete permission denied for the file: {config_file}")
             os.remove(config_file)
         else:
@@ -236,15 +239,54 @@ def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=N
         raise ValueError("Invalid operation. Expected 'read', 'write' or 'delete'.")
     
 
-    # Checks for file mismatch
-def check_folder_mismatch(folder_a, folder_b):
+# Custom function to copy directory with ability to skip certain files
+def copytree_custom(src, dst, ignore_list=None):
+    if ignore_list is None:
+        ignore_list = []
+
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            copytree_custom(s, d, ignore_list)
+        else:
+            if str(Path(s)) not in ignore_list:
+                shutil.copy2(s, d)
+
+
+# Checks for file mismatch (Unused currently due to issues)
+def check_folder_mismatch(folder_a, folder_b, profile_id):
     comparison = filecmp.dircmp(folder_a, folder_b)
 
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
+    omitted_files = [str(Path(file)) for file in omitted_files]
+
     def compare_dirs(comp):
-        if comp.diff_files or comp.left_only or comp.right_only or comp.funny_files:
+        filtered_diff_files = [file for file in comp.diff_files if file not in omitted_files]
+        filtered_left_only = [file for file in comp.left_only if file not in omitted_files]
+        filtered_right_only = [file for file in comp.right_only if file not in omitted_files]
+        filtered_funny_files = [file for file in comp.funny_files if file not in omitted_files]
+        
+        if filtered_diff_files:
+            print(f"Differing files: {filtered_diff_files}")
+        if filtered_left_only:
+            print(f"Files only in left directory: {filtered_left_only}")
+        if filtered_right_only:
+            print(f"Files only in right directory: {filtered_right_only}")
+        if filtered_funny_files:
+            print(f"Funny files: {filtered_funny_files}")
+
+        if filtered_diff_files or filtered_left_only or filtered_right_only or filtered_funny_files:
             return True
 
         match, mismatch, errors = filecmp.cmpfiles(comp.left, comp.right, comp.common_files, shallow=False)
+        if mismatch or errors:
+            print(f"Mismatched files: {mismatch}")
+            print(f"Errored files: {errors}")
+
         if mismatch or errors:
             return True
 
@@ -262,6 +304,10 @@ def copy_save_to_cloud(profile_id):
     local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     save_slot = io_profile("read", profile_id, "profile", "save_slot")
+    name = io_profile("read", profile_id, "profile", "name")
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
+
+    omitted_files = [str(Path(file)) for file in omitted_files]
 
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
 
@@ -275,13 +321,13 @@ def copy_save_to_cloud(profile_id):
             make_backup_copy(profile_id, "cloud_backup")
             
             shutil.rmtree(cloud_profile_save_path)
-            shutil.copytree(local_save_folder, cloud_profile_save_path)
-            
-            if check_folder_mismatch(local_save_folder, cloud_profile_save_path):
-                raise Exception("Mismatch in directory contents")
-            else:
-                print("Sync completed successfully.")
-                break
+            copytree_custom(local_save_folder, cloud_profile_save_path, omitted_files)
+
+            #if check_folder_mismatch(local_save_folder, cloud_profile_save_path, profile_id):
+            #    raise Exception("Mismatch in directory contents")
+            #else:
+            print(f"Sync for {name} (Profile ID: {profile_id}) to cloud completed successfully.")
+            break
         except Exception as e:
             reply = QMessageBox.critical(None, "Sync Error",
                                          f"An error occurred during the sync process: {str(e)}",
@@ -290,11 +336,17 @@ def copy_save_to_cloud(profile_id):
                 break
 
 
+
 # Function to sync saves (Copy cloud saves to local storage)
 def copy_save_to_local(profile_id):
     local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     save_slot = io_profile("read", profile_id, "profile", "save_slot")
+    name = io_profile("read", profile_id, "profile", "name")
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
+
+    omitted_files = [str(Path(file)) for file in omitted_files]
+
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
 
     if not network_share_accessible():
@@ -307,13 +359,13 @@ def copy_save_to_local(profile_id):
             make_backup_copy(profile_id, "local_backup")
 
             shutil.rmtree(local_save_folder)
-            shutil.copytree(cloud_profile_save_path, local_save_folder)
+            copytree_custom(cloud_profile_save_path, local_save_folder, omitted_files)
 
-            if check_folder_mismatch(cloud_profile_save_path, local_save_folder):
-                raise Exception("Mismatch in directory contents")
-            else:
-                print("Sync completed successfully.")
-                break
+            #if check_folder_mismatch(cloud_profile_save_path, local_save_folder, profile_id):
+            #    raise Exception("Mismatch in directory contents")
+            #else:
+            print(f"Sync for {name} (Profile ID: {profile_id}) to local save directory completed successfully.")
+            break
         except Exception as e:
             reply = QMessageBox.critical(None, "Sync Error",
                                          f"An error occurred during the sync process: {str(e)}",

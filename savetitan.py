@@ -244,7 +244,7 @@ def show_config_dialog():
                 return
 
             number_of_saves = int(io_savetitan("read", profile_id, "profile", "saves")) + 1
-            io_savetitan("write", profile_id, "profile", "saves", str(number_of_saves))  # convert number_of_saves to string
+            io_savetitan("write", profile_id, "profile", "saves", str(number_of_saves))
 
             new_save_name = f"Save {number_of_saves}"
             io_savetitan("write", profile_id, "saves", f'save{number_of_saves}', new_save_name)
@@ -699,6 +699,8 @@ def show_config_dialog():
         omit_files_dialog.setWindowFlags(omit_files_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         omit_files_dialog.setFixedSize(omit_files_dialog.size())
 
+        omit_files_dialog.setWindowTitle("SaveTitan - Omit Files From Sync")
+
         center_dialog_over_dialog(dialog, omit_files_dialog)
 
         omit_files_dialog.listWidget.setEnabled(False)
@@ -1011,16 +1013,19 @@ def show_config_dialog():
             self.filter_edit_box = self.ui.filter_lineEdit
             self.editor_table_view = self.ui.editor_tableView
 
-            self.apply_button = self.ui.apply_pushButton
-            self.okay_button = self.ui.okay_pushButton
+            self.save_button = self.ui.save_pushButton
+            self.close_button = self.ui.close_pushButton
+            self.revert_button = self.ui.revert_pushButton
             self.reset_button = self.ui.reset_pushButton
 
-            self.apply_button.clicked.connect(self.save_changes)
-            self.okay_button.clicked.connect(self.save_changes_and_close)
+            self.save_button.clicked.connect(self.save_changes)
+            self.close_button.clicked.connect(self.save_changes_and_close)
+            self.revert_button.clicked.connect(self.restore_backup)
 
             self.populate_file_combo_box()
 
             self.table_model = QStandardItemModel()
+            self.table_model.dataChanged.connect(self.check_data_type)
             self.proxy_model = QSortFilterProxyModel()
             self.proxy_model.setSourceModel(self.table_model)
             self.editor_table_view.setModel(self.proxy_model)
@@ -1044,6 +1049,37 @@ def show_config_dialog():
             self.section_combo_box.currentIndexChanged.connect(self.populate_table_view)
 
             self.populate_table_view()
+
+
+        def check_data_type(self, topLeft, bottomRight):
+            row = topLeft.row()
+            key = self.table_model.item(row, 0).text()
+            value_text = self.table_model.item(row, 1).text()
+            
+            file_path = self.file_combo_box.currentText()
+            section = self.section_combo_box.currentText() + '/'
+            
+            complete_key = section + key
+            file_format = self.file_formats.get(file_path)
+            if file_format == '.json':
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    flattened_data = self.flatten_json(data)
+                    if complete_key in flattened_data:
+                        original_value = flattened_data[complete_key]
+                        if isinstance(original_value, (int, float)):
+                            try:
+                                value = float(value_text)
+                                if value.is_integer():
+                                    value = int(value)
+                            except ValueError:
+                                msgBox = QMessageBox()
+                                msgBox.setWindowTitle("Input Error")
+                                msgBox.setText(f"Invalid input for field {key}. This field requires a numerical value.")
+                                msgBox.exec_()
+
+                                self.table_model.item(row, 1).setText(str(original_value))
+
 
         def populate_file_combo_box(self):
             profile_data = io_profile("read", self.profile_id, "profile")
@@ -1231,7 +1267,7 @@ def show_config_dialog():
                             sub_data = data
                             for sub_key in keys[:-1]:
                                 sub_data = sub_data[sub_key]
-                            
+
                             if isinstance(original_value, (int, float)):
                                 try:
                                     value = float(value_text)
@@ -1245,12 +1281,37 @@ def show_config_dialog():
                                     return
                             else:
                                 value = value_text
-                            
+
                             sub_data[keys[-1]] = value
 
                 with open(file_path, 'w') as f:
                     json.dump(data, f, indent=4)
-                    
+
+
+        def restore_backup(self):
+            original_file_path = self.file_combo_box.currentText()
+
+            backup_folder_path = os.path.join(user_config_file, "config_backup", str(self.profile_id))
+            hostname = socket.gethostname()
+            path_parts = os.path.normpath(original_file_path).split(os.sep)
+            necessary_part_path = os.path.join(*(hostname, path_parts[0].replace(':', ''), *path_parts[1:]))
+            backup_file_path = os.path.join(backup_folder_path, necessary_part_path)
+
+            if os.path.exists(backup_file_path):
+                shutil.copy2(backup_file_path, original_file_path)
+
+                msgBox = QMessageBox()
+                msgBox.setWindowTitle("Config File Restored")
+                msgBox.setText(f"The configuration file has been restored to the backup version.\n\nThe restored version is stored:\n{original_file_path}")
+                msgBox.exec_()
+
+                self.populate_table_view()
+            else:
+                msgBox = QMessageBox()
+                msgBox.setWindowTitle("No Backup File")
+                msgBox.setText(f"No backup file found to restore. It may not have been backed up or the backup was deleted.")
+                msgBox.exec_()
+
             msgBox = QMessageBox()
             msgBox.setWindowTitle("Config File Saved")
             msgBox.setText(f"The configuration file has been saved successfully.\n\nThe original version prior to any changes made here is stored:\n{backup_file_path}")

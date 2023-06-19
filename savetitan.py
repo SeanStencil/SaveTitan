@@ -455,6 +455,8 @@ def show_config_dialog():
                 "saves": "1",
                 "sync_mode": sync_mode,
             }
+            io_profile("write", profile_id, "profile", "watched_config_folders", os.path.dirname(local_save_folder), "add")
+            io_profile("write", profile_id, "profile", "watched_config_folders", os.path.dirname(game_executable), "add")
 
             for field, value in profile_fields.items():
                 io_profile("write", profile_id, "profile", field, value)
@@ -1083,22 +1085,24 @@ def show_config_dialog():
 
         def populate_file_combo_box(self):
             profile_data = io_profile("read", self.profile_id, "profile")
-            local_save_folder = io_profile("read", self.profile_id, "profile", "local_save_folder")
+            watched_config_folders = profile_data.get("watched_config_folders", [])
 
             file_paths = []
-            for root, dirs, files in os.walk(local_save_folder):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    _, ext = os.path.splitext(file_path)
-                    if ext.lower() == '.ini':
-                        with open(file_path, 'r') as f:
-                            first_line = f.readline().strip()
-                            if re.match('\[.*\]', first_line):
-                                file_paths.append(file_path)
-                                self.file_formats[file_path] = '.ini'
-                    elif ext.lower() == '.json':
-                        file_paths.append(file_path)
-                        self.file_formats[file_path] = '.json'
+            for folder in watched_config_folders:
+                print(folder)
+                for root, dirs, files in os.walk(folder):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        _, ext = os.path.splitext(file_path)
+                        if ext.lower() == '.ini':
+                            with open(file_path, 'r') as f:
+                                first_line = f.readline().strip()
+                                if re.match('\[.*\]', first_line):
+                                    file_paths.append(file_path)
+                                    self.file_formats[file_path] = '.ini'
+                        elif ext.lower() == '.json':
+                            file_paths.append(file_path)
+                            self.file_formats[file_path] = '.json'
 
             self.file_combo_box.clear()
             self.file_combo_box.addItems(["Files"] + file_paths)

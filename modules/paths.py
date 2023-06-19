@@ -15,7 +15,7 @@ if not os.path.isfile(expected_file):
 if sys.platform == "win32":
     if os.path.isfile(portable_file):
         user_config_file = os.path.join(script_dir, "user")
-        global_config_file = os.path.join(script_dir, "global.ini")
+        global_config_file = os.path.join(script_dir, "global.json")
     else:
         user_config_file = os.path.join(os.getenv('APPDATA'), "SaveTitan/user")
         global_config_file = os.path.join(os.getenv('APPDATA'), "SaveTitan/global.ini")

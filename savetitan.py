@@ -1091,10 +1091,9 @@ def show_config_dialog():
                                 msgBox.setText(f"Invalid input for field {key}. This field requires a numerical value.")
                                 msgBox.exec_()
 
-                                self.table_model.item(row, 1).setText(str(original_value))
-
                                 normal_font = QtGui.QFont()
                                 normal_font.setBold(False)
+                                self.table_model.item(row, 1).setText(str(original_value))
                                 self.table_model.item(row, 1).setFont(normal_font)
 
 
@@ -1314,20 +1313,25 @@ def show_config_dialog():
 
 
         def reset_changes(self):
+            self.table_model.dataChanged.disconnect(self.handle_item_changed)
+
             for row in range(self.table_model.rowCount()):
                 key_item = self.table_model.item(row, 0)
                 value_item = self.table_model.item(row, 1)
 
                 key = key_item.text()
                 initial_value = self.initial_values.get(key)
-                        
+                current_value = value_item.text()
+                                
+                normal_font = QtGui.QFont()
+                if str(initial_value) != current_value:
+                    normal_font.setBold(False)
+                    value_item.setFont(normal_font)
+
                 if initial_value is not None:
                     value_item.setText(str(initial_value))
-                        
-                normal_font = value_item.font()
-                normal_font.setWeight(QFont.Normal)
-                value_item.setFont(normal_font) 
 
+            self.table_model.dataChanged.connect(self.handle_item_changed)
 
 
         def restore_backup(self):

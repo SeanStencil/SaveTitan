@@ -11,6 +11,8 @@ from PyQt5.QtCore import Qt, QSortFilterProxyModel, QRegExp
 
 from modules.io import io_profile
 
+#from modules.misc import center_dialog_over_dialog
+
 import modules.paths as paths
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
@@ -71,9 +73,9 @@ class ConfigEditorDialog(QDialog):
         config_editor_add_folders_dialog.setWindowFlags(config_editor_add_folders_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         config_editor_add_folders_dialog.setFixedSize(config_editor_add_folders_dialog.size())
 
-        config_editor_add_folders_dialog.setWindowTitle("ConfigEditor - Add Watched Config Folder")
+        config_editor_add_folders_dialog.setWindowTitle("SaveTitan - Modify Monitored Config Folders")
 
-        #center_dialog_over_dialog(self.dialog, config_editor_add_folders_dialog)
+        #center_dialog_over_dialog(ConfigEditorDialog, config_editor_add_folders_dialog)
 
         config_editor_add_folders_dialog.listWidget.setEnabled(False)
 

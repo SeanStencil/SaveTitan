@@ -1004,7 +1004,7 @@ def show_config_dialog():
             self.ui = uic.loadUi("ui/config_editor.ui", self)
             self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
             
-            self.ui.editor_tableView.setEnabled(False)
+            #self.ui.editor_tableView.setEnabled(False)
 
             self.profile_id = profile_id
             
@@ -1021,10 +1021,11 @@ def show_config_dialog():
             self.reset_button = self.ui.reset_pushButton
 
             self.save_button.clicked.connect(self.save_changes)
-            self.close_button.clicked.connect(self.save_changes_and_close)
+            self.close_button.clicked.connect(lambda: self.accept())
             self.revert_button.clicked.connect(self.restore_backup)
 
             self.populate_file_combo_box()
+            self.populate_section_combo_box()
 
             self.table_model = QStandardItemModel()
             self.table_model.dataChanged.connect(self.check_data_type)
@@ -1089,7 +1090,6 @@ def show_config_dialog():
 
             file_paths = []
             for folder in watched_config_folders:
-                print(folder)
                 for root, dirs, files in os.walk(folder):
                     for file in files:
                         file_path = os.path.join(root, file)
@@ -1126,30 +1126,28 @@ def show_config_dialog():
             flatten(y)
             return out
 
-            self.file_combo_box.clear()
-            self.file_combo_box.addItems(["Files"] + file_paths)
-
 
         def populate_section_combo_box(self):
             file_path = self.file_combo_box.currentText()
 
+            self.section_combo_box.clear()
+            self.section_combo_box.addItem("Section")
+
             if file_path == "Files":
                 return
-
-            self.section_combo_box.clear()
 
             if self.file_formats[file_path] == '.ini':
                 config = configparser.ConfigParser()
                 config.read(file_path)
 
                 self.section_combo_box.addItems(config.sections())
-                
+                    
             elif self.file_formats[file_path] == '.json':
                 with open(file_path, 'r') as f:
                     data = json.load(f)
                     sections = set(key.rsplit('/', 1)[0] for key in self.flatten_json(data).keys())
                     self.section_combo_box.addItems(list(sections))
-        
+
         
         def populate_table_view(self):
             file_path = self.file_combo_box.currentText()
@@ -1209,6 +1207,9 @@ def show_config_dialog():
 
 
         def save_changes(self):
+            if self.file_combo_box.currentText() == "Files" or self.section_combo_box.currentText() == "Section":
+                return
+
             file_path = self.file_combo_box.currentText()
 
             backup_folder_path = os.path.join(user_config_file, "config_backup", str(self.profile_id))
@@ -1291,8 +1292,16 @@ def show_config_dialog():
                 with open(file_path, 'w') as f:
                     json.dump(data, f, indent=4)
 
+            msgBox = QMessageBox()
+            msgBox.setWindowTitle("Config File Saved")
+            msgBox.setText(f"The configuration file has been saved successfully.\n\nNote: An original version of this file is permanently stored here, even if you make further changes:\n\n{backup_file_path}")
+            msgBox.exec_()
+
 
         def restore_backup(self):
+            if self.file_combo_box.currentText() == "Files":
+                return
+
             original_file_path = self.file_combo_box.currentText()
 
             backup_folder_path = os.path.join(user_config_file, "config_backup", str(self.profile_id))

@@ -19,7 +19,7 @@ if sys.platform == "win32":
         global_config_file = os.path.join(script_dir, "global.json")
     else:
         user_config_file = os.path.join(os.getenv('APPDATA'), "SaveTitan/user")
-        global_config_file = os.path.join(os.getenv('APPDATA'), "SaveTitan/global.ini")
+        global_config_file = os.path.join(os.getenv('APPDATA'), "SaveTitan/global.json")
 else:
     profiles_config_file = os.path.join(script_dir, "user/profiles")
-    global_config_file = os.path.join(script_dir, "global.ini")
+    global_config_file = os.path.join(script_dir, "global.json")

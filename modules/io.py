@@ -309,32 +309,44 @@ def check_folder_mismatch(folder_a, folder_b, profile_id):
 
 
 # Function to sync saves (Copy local saves to cloud storage)
-def copy_save_to_cloud(profile_id):
-    local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
+def copy_save_to_cloud(profile_id, consider_omitted=True):
+    profile_data = io_profile("read", profile_id, "profile")
+    local_save_folder = profile_data.get("local_save_folder")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-    save_slot = io_profile("read", profile_id, "profile", "save_slot")
-    name = io_profile("read", profile_id, "profile", "name")
-    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
+    save_slot = profile_data.get("save_slot")
+    name = profile_data.get("name")
 
-    omitted_files = [str(Path(file)) for file in omitted_files]
+    omitted_files = []
+    if consider_omitted:
+        overrides_data = io_profile("read", profile_id, "overrides")
+        omitted_files_str = overrides_data.get("omitted", "")
+        omitted_files = [os.path.normpath(Path(file)) for file in omitted_files_str.split(",")] if omitted_files_str else []
 
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
 
     if not network_share_accessible():
         return
-        
+
     while True:
         try:
             os.makedirs(cloud_profile_save_path, exist_ok=True)
             
             make_backup_copy(profile_id, "cloud_backup")
             
-            shutil.rmtree(cloud_profile_save_path)
-            copytree_custom(local_save_folder, cloud_profile_save_path, omitted_files)
+            for root, dirs, files in os.walk(local_save_folder):
+                for file in files:
+                    file_path = os.path.normpath(os.path.join(root, file))
+                    rel_path = os.path.relpath(file_path, local_save_folder)
+                    dest_path = os.path.join(cloud_profile_save_path, rel_path)
 
-            #if check_folder_mismatch(local_save_folder, cloud_profile_save_path, profile_id):
-            #    raise Exception("Mismatch in directory contents")
-            #else:
+                    if consider_omitted and file_path in omitted_files:
+                        continue
+
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    if os.path.exists(dest_path):
+                        os.remove(dest_path)
+                    shutil.copy2(file_path, dest_path)
+
             print(f"Sync for {name} (Profile ID: {profile_id}) to cloud completed successfully.")
             break
         except Exception as e:
@@ -345,16 +357,19 @@ def copy_save_to_cloud(profile_id):
                 break
 
 
-
 # Function to sync saves (Copy cloud saves to local storage)
-def copy_save_to_local(profile_id):
-    local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
+def copy_save_to_local(profile_id, consider_omitted=True):
+    profile_data = io_profile("read", profile_id, "profile")
+    local_save_folder = profile_data.get("local_save_folder")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-    save_slot = io_profile("read", profile_id, "profile", "save_slot")
-    name = io_profile("read", profile_id, "profile", "name")
-    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
+    save_slot = profile_data.get("save_slot")
+    name = profile_data.get("name")
 
-    omitted_files = [str(Path(file)) for file in omitted_files]
+    omitted_files = []
+    if consider_omitted:
+        overrides_data = io_profile("read", profile_id, "overrides")
+        omitted_files_str = overrides_data.get("omitted", "")
+        omitted_files = [os.path.normpath(Path(file)) for file in omitted_files_str.split(",")] if omitted_files_str else []
 
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
 
@@ -367,12 +382,20 @@ def copy_save_to_local(profile_id):
 
             make_backup_copy(profile_id, "local_backup")
 
-            shutil.rmtree(local_save_folder)
-            copytree_custom(cloud_profile_save_path, local_save_folder, omitted_files)
+            for root, dirs, files in os.walk(cloud_profile_save_path):
+                for file in files:
+                    file_path = os.path.normpath(os.path.join(root, file))
+                    rel_path = os.path.relpath(file_path, cloud_profile_save_path)
+                    dest_path = os.path.join(local_save_folder, rel_path)
 
-            #if check_folder_mismatch(cloud_profile_save_path, local_save_folder, profile_id):
-            #    raise Exception("Mismatch in directory contents")
-            #else:
+                    if consider_omitted and file_path in omitted_files:
+                        continue
+
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    if os.path.exists(dest_path):
+                        os.remove(dest_path)
+                    shutil.copy2(file_path, dest_path)
+
             print(f"Sync for {name} (Profile ID: {profile_id}) to local save directory completed successfully.")
             break
         except Exception as e:

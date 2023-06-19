@@ -194,7 +194,7 @@ def launch_game(profile_id):
         message_box.exec_()
 
         if message_box.clickedButton() == done_button:
-            copy_save_to_cloud(profile_id, True)
+            copy_save_to_cloud(profile_id)
 
         io_savetitan("write", profile_id, "profile", "checkout")
 

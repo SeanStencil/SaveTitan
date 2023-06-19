@@ -91,7 +91,7 @@ def save_mgmt_dialog(profile_id):
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
 
         if reply == QMessageBox.Yes:
-            copy_save_to_cloud(profile_id, True)
+            copy_save_to_cloud(profile_id)
 
         new_save_slot = selected_save_key.replace('save', '')
         
@@ -99,7 +99,7 @@ def save_mgmt_dialog(profile_id):
 
         save_mgmt_dialog.saveslotField.setText(selected_item.text())
 
-        copy_save_to_local(profile_id, True)
+        copy_save_to_local(profile_id)
 
         QMessageBox.information(None, "Load Finished", "The selected save has been loaded successfully.")
 

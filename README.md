@@ -1,4 +1,11 @@
-# SaveTitan
-SaveTitan is a game save management tool that allows you to sync your game saves between your local saves and a cloud storage location.
 
-PLEASE NOTE: THIS IS AN EXPERIMENTAL PROJECT I FELT LIKE DOING ON A WHIM. THIS IS NOT MEANT FOR PUBLIC CONSUMPTION YET, IT'S NOT FEATURE COMPLETE AND KIND OF BROKEN. DON'T AIM IT AT ANYTHING YOU HAVEN'T BACKED UP BECAUSE IT IS DESIGNED TO MOVE AROUND YOUR SAVES.
+# SaveTitan
+
+SaveTitan is a python script that allows you to backup your PC saved games to a local drive or netork storage location that provides a game syncing experience between devices similar to services integrated into Steam, Xbox, and other platforms. It also has some additional features that I felt like adding such as, an ini/json config modification tool to simplifly the process of locating files, editing, backing up, searching, in an all in one tool thing.
+
+THIS IS CURRENTLY A VERY EARLY UNSTABLE BUILD AND IS NOT REGARDED SAFE AROUND YOUR FILES SO MAKE SURE TO BACK UP EVERYTHING YOU POINT THIS TO. USE AT YOUR OWN RISK
+
+
+## Installation
+
+Details coming soon as I get closer to release

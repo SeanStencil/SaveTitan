@@ -1279,11 +1279,14 @@ def show_config_dialog():
                                     if value.is_integer():
                                         value = int(value)
                                 except ValueError:
-                                    msgBox = QMessageBox()
-                                    msgBox.setWindowTitle("Input Error")
-                                    msgBox.setText(f"Invalid input for field {key}. This field requires a numerical value.")
-                                    msgBox.exec_()
-                                    return
+                                    if not value_text.replace('.', '', 1).isdigit():
+                                        value = value_text
+                                    else:
+                                        msgBox = QMessageBox()
+                                        msgBox.setWindowTitle("Input Error")
+                                        msgBox.setText(f"Invalid input for field {key}. This field requires a numerical value.")
+                                        msgBox.exec_()
+                                        return
                             else:
                                 value = value_text
 

@@ -1213,13 +1213,8 @@ def show_config_dialog():
             file_path = self.file_combo_box.currentText()
 
             backup_folder_path = os.path.join(user_config_file, "config_backup", str(self.profile_id))
-
-            hostname = socket.gethostname()
-
             path_parts = os.path.normpath(file_path).split(os.sep)
-
-            necessary_part_path = os.path.join(*(hostname, path_parts[0].replace(':', ''), *path_parts[1:]))
-
+            necessary_part_path = os.path.join(*(path_parts[0].replace(':', ''), *path_parts[1:]))
             backup_file_path = os.path.join(backup_folder_path, necessary_part_path)
 
             os.makedirs(os.path.dirname(backup_file_path), exist_ok=True)

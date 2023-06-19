@@ -8,9 +8,9 @@ import socket
 import json
 import re
 
-from PyQt5 import QtWidgets, uic, QtCore
+from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem, QLabel, QCheckBox, QPushButton, QVBoxLayout
-from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardItem
+from PyQt5.QtGui import QIcon, QDesktopServices, QStandardItemModel, QStandardItem, QFont
 from PyQt5.QtCore import Qt, QModelIndex, QSortFilterProxyModel, QUrl, QRegExp
 
 from modules.io import generate_id
@@ -26,8 +26,6 @@ from modules.sync import check_and_sync_saves
 
 from modules.misc import center_dialog_over_dialog
 
-import modules.io as io
-import modules.sync as io
 import modules.paths as paths
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
@@ -1001,10 +999,10 @@ def show_config_dialog():
         def __init__(self, profile_id, parent=None):
             super().__init__(parent)
 
+            self.initial_data = {}
+
             self.ui = uic.loadUi("ui/config_editor.ui", self)
             self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
-            
-            #self.ui.editor_tableView.setEnabled(False)
 
             self.profile_id = profile_id
             
@@ -1020,6 +1018,7 @@ def show_config_dialog():
             self.revert_button = self.ui.revert_pushButton
             self.reset_button = self.ui.reset_pushButton
 
+            self.reset_pushButton.clicked.connect(self.reset_changes)
             self.save_button.clicked.connect(self.save_changes)
             self.close_button.clicked.connect(lambda: self.accept())
             self.revert_button.clicked.connect(self.restore_backup)
@@ -1028,9 +1027,11 @@ def show_config_dialog():
             self.populate_section_combo_box()
 
             self.table_model = QStandardItemModel()
-            self.table_model.dataChanged.connect(self.check_data_type)
+            self.table_model.dataChanged.connect(self.handle_item_changed)
+
             self.proxy_model = QSortFilterProxyModel()
             self.proxy_model.setSourceModel(self.table_model)
+
             self.editor_table_view.setModel(self.proxy_model)
             self.editor_table_view.verticalHeader().setVisible(False)
 
@@ -1040,6 +1041,7 @@ def show_config_dialog():
             self.filter_edit_box.textChanged.connect(self.update_filter)
 
             self.populate_table_view()
+
 
         def update_filter(self, text):
             search = QRegExp(text, Qt.CaseInsensitive, QRegExp.FixedString)
@@ -1054,7 +1056,15 @@ def show_config_dialog():
             self.populate_table_view()
 
 
-        def check_data_type(self, topLeft, bottomRight):
+        def handle_item_changed(self, topLeft, bottomRight):
+            bold_font = QtGui.QFont()
+            bold_font.setBold(True)
+
+            for row in range(topLeft.row(), bottomRight.row() + 1):
+                for column in range(topLeft.column(), bottomRight.column() + 1):
+                    item = self.table_model.item(row, column)
+                    item.setFont(bold_font)
+
             row = topLeft.row()
             key = self.table_model.item(row, 0).text()
             value_text = self.table_model.item(row, 1).text()
@@ -1082,6 +1092,10 @@ def show_config_dialog():
                                 msgBox.exec_()
 
                                 self.table_model.item(row, 1).setText(str(original_value))
+
+                                normal_font = QtGui.QFont()
+                                normal_font.setBold(False)
+                                self.table_model.item(row, 1).setFont(normal_font)
 
 
         def populate_file_combo_box(self):
@@ -1161,15 +1175,17 @@ def show_config_dialog():
             self.editor_table_view.resizeRowsToContents()
 
             file_format = self.file_formats.get(file_path)
+            
+            self.initial_values = {}
 
             if file_format == '.ini':
                 config = configparser.ConfigParser()
                 config.read(file_path)
 
                 if section in config:
-                    self.ui.editor_tableView.setEnabled(True)
                     for key, value in config.items(section):
                         self.add_row_to_table(key, value)
+                        self.initial_values[key] = value
 
             elif file_format == '.json':
                 with open(file_path, 'r') as f:
@@ -1180,15 +1196,16 @@ def show_config_dialog():
 
                     for key in flattened_data:
                         if key.startswith(section):
-                            self.ui.editor_tableView.setEnabled(True)
                             modified_key = key.replace(section, '')
                             value = flattened_data[key]
                             if '/' not in modified_key:
                                 self.add_row_to_table(modified_key, str(value))
+                                self.initial_values[modified_key] = str(value)
 
                     stripped_section = section.strip('/')
                     if stripped_section in data and not isinstance(data[stripped_section], (dict, list)):
                         self.add_row_to_table("Value", str(data[stripped_section]))
+                        self.initial_values["Value"] = str(data[stripped_section])
 
             self.editor_table_view.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
             self.editor_table_view.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
@@ -1294,6 +1311,23 @@ def show_config_dialog():
             msgBox.setWindowTitle("Config File Saved")
             msgBox.setText(f"The configuration file has been saved successfully.\n\nNote: An original version of this file is permanently stored here, even if you make further changes:\n\n{backup_file_path}")
             msgBox.exec_()
+
+
+        def reset_changes(self):
+            for row in range(self.table_model.rowCount()):
+                key_item = self.table_model.item(row, 0)
+                value_item = self.table_model.item(row, 1)
+
+                key = key_item.text()
+                initial_value = self.initial_values.get(key)
+                        
+                if initial_value is not None:
+                    value_item.setText(str(initial_value))
+                        
+                normal_font = value_item.font()
+                normal_font.setWeight(QFont.Normal)
+                value_item.setFont(normal_font) 
+
 
 
         def restore_backup(self):

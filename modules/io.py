@@ -318,8 +318,6 @@ def copy_save_to_cloud(profile_id):
 
     omitted_files_str = io_profile("read", profile_id, "overrides", "omitted") or ""
     omitted_files = [os.path.normpath(f.strip()) for f in omitted_files_str.split(",") if f.strip()]
-    
-    print("omitted_files", omitted_files)
 
     cloud_profile_save_path = Path(cloud_storage_path) / profile_id / f"save{save_slot}"
 
@@ -359,8 +357,6 @@ def copy_save_to_local(profile_id):
 
     omitted_files_str = io_profile("read", profile_id, "overrides", "omitted") or ""
     omitted_files = [os.path.normpath(f.strip()) for f in omitted_files_str.split(",") if f.strip()]
-
-    print("omitted files: ", omitted_files)
 
     if not network_share_accessible():
         return

@@ -37,7 +37,8 @@ def check_and_sync_saves(profile_id):
     sync_mode = profile_fields.get("sync_mode")
 
     # Read omitted files
-    omitted_files = io_profile("read", profile_id, "overrides", "omitted").split(',')
+    omitted_files_str = io_profile("read", profile_id, "overrides", "omitted") or ""
+    omitted_files = [os.path.normpath(f.strip()) for f in omitted_files_str.split(",") if f.strip()]
 
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id, "save" + save_slot)
 
@@ -53,7 +54,6 @@ def check_and_sync_saves(profile_id):
         checkout_msgbox.setWindowTitle("Checkout Warning")
         checkout_msgbox.setText(
             f"Someone started playing from \"{checkout_previous_user}\" and hasn't synced yet. (This can happen if the other computer didn't close SaveTitan through normal operation)\n\n"
-            f""
             f"Do you want to continue?"
         )
         yes_button = checkout_msgbox.addButton(QMessageBox.Yes)
@@ -76,12 +76,16 @@ def check_and_sync_saves(profile_id):
                 local_file = os.path.join(dirpath, filename)
 
                 # Check: Skip omitted files
-                local_file = str(Path(local_file))
+                local_file = os.path.normpath(str(Path(local_file)))
                 if local_file in omitted_files:
                     continue
 
                 cloud_file = os.path.join(cloud_profile_save_path, os.path.relpath(local_file, local_save_folder))
                 if os.path.exists(cloud_file):
+                    # Skip omitted cloud files
+                    cloud_file = os.path.normpath(str(Path(cloud_file)))
+                    if cloud_file in omitted_files:
+                        continue
                     if not filecmp.cmp(local_file, cloud_file, shallow=False):
                         files_identical = False
                         break
@@ -117,15 +121,26 @@ def check_and_sync_saves(profile_id):
             for dirpath, dirnames, filenames in os.walk(local_save_folder):
                 for filename in filenames:
                     local_file = os.path.join(dirpath, filename)
-
-                    # Check: Skip omitted files                    
-                    local_file = str(Path(local_file))
-                    if local_file in omitted_files:
+                    # Skip omitted files                    
+                    local_file_norm = os.path.normpath(str(Path(local_file)))
+                    if local_file_norm in omitted_files:
                         continue
 
                     file_time = datetime.fromtimestamp(os.path.getmtime(os.path.join(dirpath, filename)))
                     if local_file_time < file_time:
                         local_file_time = file_time
+                           
+            for dirpath, dirnames, filenames in os.walk(cloud_profile_save_path):
+                for filename in filenames:
+                    cloud_file = os.path.join(dirpath, filename)
+
+                    cloud_file_norm = os.path.normpath(str(Path(cloud_file)))
+                    if cloud_file_norm in omitted_files:
+                        continue
+                    
+                    file_time = datetime.fromtimestamp(os.path.getmtime(os.path.join(dirpath, filename)))
+                    if cloud_file_time < file_time:
+                        cloud_file_time = file_time
                            
             for dirpath, dirnames, filenames in os.walk(cloud_profile_save_path):
                 for filename in filenames:

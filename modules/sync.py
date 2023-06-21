@@ -22,6 +22,7 @@ from modules.io import copy_save_to_cloud
 from modules.io import copy_save_to_local
 
 import modules.paths as paths
+script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 

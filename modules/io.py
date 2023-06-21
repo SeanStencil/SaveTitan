@@ -11,6 +11,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import QMessageBox
 
 import modules.paths as paths
+script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 game_overrides_config_file = paths.game_overrides_config_file

@@ -2,6 +2,9 @@ import os
 import argparse
 import sys
 import glob
+import pythoncom
+
+from win32com.shell import shell, shellcon
 
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem, QLabel, QCheckBox, QPushButton, QVBoxLayout
@@ -26,6 +29,7 @@ from components.config_editor import ConfigEditorDialog
 from components.save_manager import save_mgmt_dialog
 
 import modules.paths as paths
+script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 
@@ -804,6 +808,48 @@ def show_config_dialog():
         QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
 
 
+    def create_shortcut(path, target, arguments="", icon=""):
+        shortcut = pythoncom.CoCreateInstance(
+            shell.CLSID_ShellLink,
+            None,
+            pythoncom.CLSCTX_INPROC_SERVER,
+            shell.IID_IShellLink
+        )
+        shortcut.SetPath(target)
+        shortcut.SetArguments(arguments)
+        if icon:
+            shortcut.SetIconLocation(icon, 0)
+        persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+        persist_file.Save(path, 0)
+
+
+    def create_shortcut_for_profile(profile_id):
+        profile_name = io_profile("read", profile_id, "profile", "name")
+        if not profile_name:
+            QMessageBox.warning(None, "Profile Not Found", "The selected profile was not found in the config file.")
+            return
+
+        script_name = os.path.basename(sys.argv[0])
+        executable_path = os.path.join(script_dir, script_name)
+
+        if not os.path.isfile(executable_path):
+            QMessageBox.warning(None, "Executable Not Found", "The executable path was not found for the selected profile.")
+            return
+
+        desktop_folder = os.path.join(os.path.expanduser('~'), 'Desktop')
+        shortcut_path = os.path.join(desktop_folder, f'{profile_name}.lnk')
+        arguments = f'-runid {profile_id}'
+
+        game_executable = io_profile("read", profile_id, "profile", "game_executable")
+        if not game_executable:
+            QMessageBox.warning(None, "Game Executable Not Found", "The game executable path was not found for the selected profile.")
+            return
+
+        icon_path = game_executable if os.path.exists(game_executable) else ""
+
+        create_shortcut(shortcut_path, executable_path, arguments, icon_path)
+
+
     # Function to create context menu
     def context_menu(point):
         menu = QMenu()
@@ -815,6 +861,8 @@ def show_config_dialog():
         open_save_editor_action = QAction("Open Config Editor", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
+        if sys.platform == "win32":
+            create_shortcut_action = QAction("Create Shortcut", menu)
 
         index = configprofileView.indexAt(point)
         
@@ -829,6 +877,8 @@ def show_config_dialog():
             open_save_editor_action.setEnabled(True)
             delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
             copy_profile_id_action.triggered.connect(lambda: QApplication.clipboard().setText(selected_profile_id))
+            if sys.platform == "win32":
+                create_shortcut_action.triggered.connect(lambda: create_shortcut_for_profile(selected_profile_id))
 
             menu.addAction(open_local_save_action)
             menu.addAction(open_cloud_storage_action)
@@ -841,6 +891,8 @@ def show_config_dialog():
             menu.addAction(delete_profile_action)
             menu.addSeparator()
             menu.addAction(copy_profile_id_action)
+            if sys.platform == "win32":
+                menu.addAction(create_shortcut_action)
 
             menu.exec_(configprofileView.viewport().mapToGlobal(point))
 

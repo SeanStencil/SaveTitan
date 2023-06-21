@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QMessageBox
 import modules.paths as paths
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
-
+game_overrides_config_file = paths.game_overrides_config_file
 
 # Generate a 6 character string for use for profile_id's
 def generate_id():
@@ -59,13 +59,13 @@ def network_share_accessible():
         return False
 
 
-def io_profile(read_write_mode, profile_id=None, section=None, field=None, value=None, value_modify=None):
+def io_profile(read_write_mode, profile_id=None, section=None, field=None, value=None, modifier=None):
     read_write_mode = str(read_write_mode)
     profile_id = str(profile_id) if profile_id is not None else None
     section = str(section) if section is not None else None
     field = str(field) if field is not None else None
     value = str(value) if value is not None else None
-    value_modify = str(value_modify) if value_modify is not None else None
+    modifier = str(modifier) if modifier is not None else None
 
     if read_write_mode == "read":
 
@@ -134,11 +134,11 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
 
         current_value = data[section].get(field, "")
 
-        if value_modify == "add":
+        if modifier == "add":
             if not isinstance(current_value, list):
                 current_value = [current_value] if current_value else []
             current_value.append(value)
-        elif value_modify == "remove":
+        elif modifier == "remove":
             if isinstance(current_value, list) and value in current_value:
                 current_value.remove(value)
             elif not isinstance(current_value, list) and current_value == value:
@@ -163,16 +163,27 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
             raise FileNotFoundError(f"No profile found with ID: {profile_id}")
 
 
-def io_global(read_write_mode, section=None, field=None, value=None):
-    read_write_mode = str(read_write_mode)
+def io_config(read_write_mode, config_file, section=None, field=None, value=None, modifier=None):
+    read_write_mode = str(read_write_mode).lower()
     section = str(section) if section is not None else None
     field = str(field) if field is not None else None
-    value = str(value) if value is not None else None
+
+    original_value = value  # Keep the original value
+    if isinstance(value, str):
+        value = value.lower()
+        if value == 'true':
+            value = True
+        elif value == 'false':
+            value = False
+
+    modifier = str(modifier).lower() if modifier is not None else None
 
     data = {}
-    if os.path.exists(global_config_file):
-        with open(global_config_file, 'r') as f:
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
             data = json.load(f)
+    else:
+        print(f"File {config_file} does not exist. Data is empty.")
 
     if read_write_mode == "read":
         if not section or not field:
@@ -182,27 +193,52 @@ def io_global(read_write_mode, section=None, field=None, value=None):
     elif read_write_mode == "write":
         if not section or not field:
             raise ValueError("For 'write' mode, section and field must be specified.")
-        
-        os.makedirs(os.path.dirname(global_config_file), exist_ok=True)
+
+        os.makedirs(os.path.dirname(config_file), exist_ok=True)
 
         if section not in data:
             data[section] = {}
 
-        data[section][field] = value if value is not None else ""
-        with open(global_config_file, "w") as f:
+        current_value = data[section].get(field, "")
+
+        if modifier == "add":
+            if not isinstance(current_value, list):
+                current_value = [current_value] if current_value else []
+            if original_value not in current_value:
+                current_value.append(original_value)
+        elif modifier == "remove":
+            if isinstance(current_value, list):
+                current_value = [item for item in current_value if str(item).lower() != value]
+            elif not isinstance(current_value, list) and str(current_value).lower() == value:
+                current_value = None
+        else:
+            current_value = value if value is not None else ""
+
+        data[section][field] = current_value
+        with open(config_file, "w") as f:
             json.dump(data, f)
-            
+
     else:
         raise ValueError("Invalid mode. Expected 'read' or 'write'.")
 
 
-def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=None):
+def io_global(read_write_mode, section=None, field=None, value=None, modifier=None):
+    return io_config(read_write_mode, global_config_file, section, field, value, modifier)
+
+
+def io_go(read_write_mode, section=None, field=None, value=None, modifier=None):
+    return io_config(read_write_mode, game_overrides_config_file, section, field, value, modifier)
+
+
+def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=None, modifier=None):
     profile_id = str(profile_id)
     section = str(section)
     if field is not None:
         field = str(field)
     if write_value is not None:
         write_value = str(write_value)
+    if modifier is not None:
+        modifier = str(modifier)
 
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     if cloud_storage_path is None:
@@ -228,7 +264,21 @@ def io_savetitan(read_write_mode, profile_id, section, field=None, write_value=N
         if section not in data:
             data[section] = {}
 
-        data[section][field] = "" if write_value is None else str(write_value)
+        current_value = data[section].get(field, "")
+
+        if modifier == "add":
+            if not isinstance(current_value, list):
+                current_value = [current_value] if current_value else []
+            current_value.append(write_value)
+        elif modifier == "remove":
+            if isinstance(current_value, list) and write_value in current_value:
+                current_value.remove(write_value)
+            elif not isinstance(current_value, list) and current_value == write_value:
+                current_value = None
+        else:
+            current_value = write_value if write_value is not None else ""
+
+        data[section][field] = current_value
 
         with open(profile_info_path, 'w') as f:
             json.dump(data, f)

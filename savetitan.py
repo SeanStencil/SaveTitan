@@ -13,9 +13,11 @@ from modules.io import check_permissions
 from modules.io import network_share_accessible
 from modules.io import io_profile
 from modules.io import io_global
+from modules.io import io_go
 from modules.io import io_savetitan
 
 from modules.sync import check_and_sync_saves
+from modules.sync import upload_dialog
 
 from modules.misc import center_dialog_over_dialog
 
@@ -896,9 +898,20 @@ def show_risk_warning_if_needed():
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser()
+
 parser.add_argument("-runprofile", help="Specify the game profile to be used")
 parser.add_argument("-runid", help="Specify the profile ID to be used")
 parser.add_argument("-list", action='store_true', help="List all profiles in profiles.ini")
+parser.add_argument('-upload')
+parser.add_argument('-go', action='store_true', help='Command line config editor for io_go')
+
+go_group = parser.add_argument_group('go arguments')
+go_group.add_argument('--executable_name', help='Executable Name')
+go_group.add_argument('--go_modifier', choices=['list', 'add', 'remove'], help='Go Modifier')
+go_group.add_argument('--go_field', choices=['process_name', 'process_tracking'], help='Go Field')
+go_group.add_argument('--go_value', help='Go Value', nargs='?', default=None)
+
+args = parser.parse_args()
 args = parser.parse_args()
 
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
@@ -967,6 +980,28 @@ elif args.runid:
     show_risk_warning_if_needed()
 
     check_and_sync_saves(profile_id)
+
+elif args.go:
+    read_write_mode = 'read' if args.go_modifier == 'list' else 'write'
+
+    if args.go_field in ['process_tracking', 'process_name']:
+        if args.go_field == 'process_tracking':
+            if args.go_value.lower() not in ['true', 'false']:
+                print("Invalid value for 'process_tracking'. It should be either 'true' or 'false'.")
+            else:
+                io_go(read_write_mode, args.executable_name, args.go_field, args.go_value)
+        elif args.go_field == 'process_name':
+            io_go(read_write_mode, args.executable_name, args.go_field, args.go_value, args.go_modifier)
+    sys.exit(1)
+
+elif args.upload:
+    if args.upload:
+        profile_id = args.upload
+        upload_dialog(profile_id)
+    else:
+        print("Error: -upload requires a profile ID")
+        sys.exit(1)
+
 else:
     show_risk_warning_if_needed()
 

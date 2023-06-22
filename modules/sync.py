@@ -22,7 +22,6 @@ from modules.io import copy_save_to_cloud
 from modules.io import copy_save_to_local
 
 from modules.notifications import send_notification
-from modules.notifications import debug_msg
 
 import modules.paths as paths
 script_dir = paths.script_dir

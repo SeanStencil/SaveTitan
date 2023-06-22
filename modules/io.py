@@ -378,6 +378,11 @@ def copy_save_to_cloud(profile_id):
     
     make_backup_copy(profile_id, "cloud_backup")
 
+    for file in cloud_profile_save_path.glob('*'):
+        if file.is_file():
+            file.unlink()
+        elif file.is_dir():
+            shutil.rmtree(file)
     for root, dirs, files in os.walk(local_save_folder):
         for file in files:
             file_path = Path(root) / file
@@ -415,6 +420,13 @@ def copy_save_to_local(profile_id):
         return
 
     make_backup_copy(profile_id, "local_backup")
+
+    local_save_folder_path = Path(local_save_folder)
+    for file in local_save_folder_path.glob('*'):
+        if file.is_file():
+            file.unlink()
+        elif file.is_dir():
+            shutil.rmtree(file)
 
     for root, dirs, files in os.walk(cloud_profile_save_path):
         for file in files:

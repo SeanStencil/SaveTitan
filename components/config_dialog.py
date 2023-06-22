@@ -1,9 +1,6 @@
 import os
 import sys
 import glob
-import pythoncom
-
-from win32com.shell import shell
 
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QMenu, QAction, QDialog
@@ -809,6 +806,8 @@ def show_config_dialog():
 
 
     def create_shortcut(path, target, arguments="", icon=""):
+        from win32com.shell import shell
+        import pythoncom
         shortcut = pythoncom.CoCreateInstance(
             shell.CLSID_ShellLink,
             None,

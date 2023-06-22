@@ -77,8 +77,6 @@ go_group.add_argument('--go_value', help='Go Value', nargs='?', default=None)
 
 args = parser.parse_args()
 
-print(args)
-
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
 app = QApplication([])

@@ -18,6 +18,8 @@ import modules.paths as paths
 script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
+game_overrides_config_file = paths.game_overrides_config_file
+python_exe_path = paths.python_exe_path
 
 
 class RiskWarningDialog(QDialog):
@@ -64,16 +66,6 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--runprofile", help="Specify the game profile name to be used")
 parser.add_argument("--runid", help="Specify the profile ID to be used")
-parser.add_argument("--list", action='store_true', help="List all profiles in profiles.ini")
-parser.add_argument('--upload')
-parser.add_argument('--go', action='store_true', help='Command line config editor for io_go')
-parser.add_argument("--debug", help="Enable or disable debug mode", choices=['enable', 'disable'])
-
-go_group = parser.add_argument_group('go arguments')
-go_group.add_argument('--executable_name', help='Executable Name')
-go_group.add_argument('--go_modifier', choices=['list', 'add', 'remove'], help='Go Modifier')
-go_group.add_argument('--go_field', choices=['process_name', 'process_tracking'], help='Go Field')
-go_group.add_argument('--go_value', help='Go Value', nargs='?', default=None)
 
 args = parser.parse_args()
 
@@ -85,19 +77,7 @@ profile_data = None
 
 cloud_storage_path = io_global("read", "config", "cloud_storage_path")
 
-if args.list:
-    profile_fields = io_profile("read", None, "profile")
-    if profile_fields is None:
-        print("No profiles found in profiles.ini")
-        sys.exit(1)
-    else:
-        for profile_id, profile_data in profile_fields.items():
-            name = profile_data.get('name')
-            save_slot = profile_data.get('save_slot')
-            print(f"{profile_id} - {name} - Save Slot: {save_slot}")
-        sys.exit(1)
-
-elif args.runprofile:
+if args.runprofile:
     profile_id_list = io_profile("read", None, "profile", "name", args.runprofile)
     if len(profile_id_list) > 1:
         print("Conflict: There are multiple profiles with the same name. Aborting.")
@@ -139,36 +119,9 @@ elif args.runid:
     app.setQuitOnLastWindowClosed(False)
     check_and_sync_saves(profile_id)
 
-elif args.go:
-    read_write_mode = 'read' if args.go_modifier == 'list' else 'write'
-    if args.go_field in ['process_tracking', 'process_name']:
-        if args.go_field == 'process_tracking':
-            if args.go_value.lower() not in ['true', 'false']:
-                print("Invalid value for 'process_tracking'. It should be either 'true' or 'false'.")
-            else:
-                io_go(read_write_mode, args.executable_name, args.go_field, args.go_value)
-        elif args.go_field == 'process_name':
-            io_go(read_write_mode, args.executable_name, args.go_field, args.go_value, args.go_modifier)
-    sys.exit(1)
-
-elif args.upload:
-    if args.upload:
-        profile_id = args.upload
-        upload_dialog(profile_id)
-    else:
-        print("Error: -upload requires a profile ID")
-        sys.exit(1)
-
-elif args.debug:
-    io_global("write", "config", "debug", args.debug)
-    if args.debug == "enable":
-        print('Debug print messages set to enabled')
-    elif args.debug == "disable":
-        print('Debug print messages set to disabled')
-    sys.exit(1)
-
 else:
     show_risk_warning_if_needed()
     app.setQuitOnLastWindowClosed(True)
     show_config_dialog()
+
 app.exec_()

@@ -15,6 +15,7 @@ script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 game_overrides_config_file = paths.game_overrides_config_file
+python_exe_path = paths.python_exe_path
 
 
 # Generate a 6 character string for use for profile_id's

@@ -24,6 +24,8 @@ import modules.paths as paths
 script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
+game_overrides_config_file = paths.game_overrides_config_file
+python_exe_path = paths.python_exe_path
 
 
 # Function to show config dialog
@@ -814,9 +816,16 @@ def show_config_dialog():
             pythoncom.CLSCTX_INPROC_SERVER,
             shell.IID_IShellLink
         )
-        shortcut.SetPath(target)
-        shortcut.SetArguments(arguments)
+
+        python_exe_path = sys.executable
+
+        if 'python.exe' in python_exe_path:
+            python_exe_path = python_exe_path.replace('python.exe', 'pythonw.exe')
+
+        shortcut.SetPath(python_exe_path)  # Set the path to the Python interpreter
+        shortcut.SetArguments(f'"{target}" {arguments}')  # Add the script path and the arguments
         shortcut.SetWorkingDirectory(script_dir)
+        
         if icon:
             shortcut.SetIconLocation(icon, 0)
         persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)

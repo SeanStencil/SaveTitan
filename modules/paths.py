@@ -3,11 +3,12 @@ import sys
 
 
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-expected_file = os.path.join(script_dir, 'savetitan.py')
+expected_file = os.path.join(script_dir, 'savetitan.pyw')
 portable_file = os.path.join(script_dir, 'portable.txt')
+python_exe_path = sys.executable
 
 if not os.path.isfile(expected_file):
-    print(f"Expected to find savetitan.py in directory: {script_dir}")
+    print(f"Expected to find savetitan.pyw in directory: {script_dir}")
     sys.exit(1)
 
 if sys.platform == "win32":

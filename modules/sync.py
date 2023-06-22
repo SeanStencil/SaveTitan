@@ -28,6 +28,8 @@ import modules.paths as paths
 script_dir = paths.script_dir
 user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
+game_overrides_config_file = paths.game_overrides_config_file
+python_exe_path = paths.python_exe_path
 
 
 # Function to check and sync saves

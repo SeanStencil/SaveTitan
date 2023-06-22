@@ -22,6 +22,7 @@ from modules.io import copy_save_to_cloud
 from modules.io import copy_save_to_local
 
 from modules.notifications import send_notification
+from modules.notifications import debug_msg
 
 import modules.paths as paths
 script_dir = paths.script_dir
@@ -110,15 +111,18 @@ def check_and_sync_saves(profile_id):
             
             # Result: More local files than cloud - Action: Copy contents of local folder to cloud
             if local_files_count > cloud_files_count:
+                sync_diag.hide()
                 launch_game(profile_id)
                 
             # Result: More cloud files than local - Action: Copy contents of cloud folder to local
             elif cloud_files_count > local_files_count:
                 copy_save_to_local(profile_id)
+                sync_diag.hide()
                 launch_game(profile_id)
                 
             # Result: Content and amount of files is identical - Action: Launch the game, upload when done
             else:
+                sync_diag.hide()
                 launch_game(profile_id)
 
         # Result: Files aren't identical - Action: Compare files to find latest timestamp
@@ -177,14 +181,15 @@ def check_and_sync_saves(profile_id):
             def on_nosyncButton_clicked():
                 executable_path = io_profile("read", profile_id, "profile", "game_executable")
                 io_savetitan("write", profile_id, "profile", "checkout")
+                sync_diag.hide
                 launch_game_without_sync(executable_path)
             
             def on_rejected_connect():
                 io_savetitan("write", profile_id, "profile", "checkout")
                 sys.exit()
 
-            sync_diag.downloadButton.clicked.connect(lambda: [copy_save_to_local(profile_id), launch_game(profile_id), sync_diag.accept()])
-            sync_diag.uploadButton.clicked.connect(lambda: [launch_game(profile_id), sync_diag.accept()])
+            sync_diag.downloadButton.clicked.connect(lambda: [sync_diag.hide(), copy_save_to_local(profile_id), launch_game(profile_id)])
+            sync_diag.uploadButton.clicked.connect(lambda: [sync_diag.hide(), launch_game(profile_id)])
             sync_diag.nosyncButton.clicked.connect(lambda: [on_nosyncButton_clicked()])
 
             sync_diag.rejected.connect(lambda: on_rejected_connect())
@@ -208,23 +213,24 @@ def wait_for_process_to_finish(process_names):
 
             matching_processes = [proc for proc in psutil.process_iter(['name', 'pid']) if proc.info['name'].lower() in map(str.lower, process_names)]
             if not matching_processes:
-                print('Processes have finished.')
+                debug_msg('Processes have finished.')
                 return True
             else:
-                print(f'Processes restarted with PID {matching_processes[0].info["pid"]}. Restarting tracking.')
+                debug_msg(f'Processes restarted with PID {matching_processes[0].info["pid"]}. Restarting tracking.')
+
         time.sleep(3)
 
 
 def launch_game(profile_id):
-    #Load Data Set
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-    profile_name = io_profile("read", profile_id, "profile", "name")
-    game_executable = io_profile("read", profile_id, "profile", "game_executable")
-    profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id, "profile_into.savetitan")
+    profile_data = io_profile("read", profile_id, "profile")
+    profile_name = profile_data.get("name")
+    game_executable = profile_data.get("game_executable")
+
     game_filename = os.path.basename(game_executable)
     process_names = io_go("read", game_filename, "process_name")
-    process_names = [game_filename] + (process_names if process_names is not None else [])
-
+    process_names = [game_filename] + (process_names if process_names else [])
+    
     if not check_permissions(game_executable, 'game executable', "execute"):
         return
 
@@ -237,12 +243,13 @@ def launch_game(profile_id):
     if wait_for_process_to_finish(process_names):
 
         def upload_and_exit():
-            profile_name = io_profile("read", profile_id, "profile", "name")
             result = copy_save_to_cloud(profile_id)
+
             if result == None:
                 send_notification("SaveTitan", f"Sync for Profile ID: {profile_name} to cloud completed successfully.")
             else:
                 send_notification("SaveTitan", f"Cloud sync failed: {result}")
+            
             io_savetitan("write", profile_id, "profile", "checkout")
             sys.exit()
 

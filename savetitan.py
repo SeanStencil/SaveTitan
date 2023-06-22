@@ -951,11 +951,12 @@ def show_risk_warning_if_needed():
 # Parse command-line arguments
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-runprofile", help="Specify the game profile to be used")
-parser.add_argument("-runid", help="Specify the profile ID to be used")
-parser.add_argument("-list", action='store_true', help="List all profiles in profiles.ini")
-parser.add_argument('-upload')
-parser.add_argument('-go', action='store_true', help='Command line config editor for io_go')
+parser.add_argument("--runprofile", help="Specify the game profile name to be used")
+parser.add_argument("--runid", help="Specify the profile ID to be used")
+parser.add_argument("--list", action='store_true', help="List all profiles in profiles.ini")
+parser.add_argument('--upload')
+parser.add_argument('--go', action='store_true', help='Command line config editor for io_go')
+parser.add_argument("--debug", help="Enable or disable debug mode", choices=['enable', 'disable'])
 
 go_group = parser.add_argument_group('go arguments')
 go_group.add_argument('--executable_name', help='Executable Name')
@@ -969,6 +970,8 @@ args = parser.parse_args()
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
 app = QApplication([])
+app.setQuitOnLastWindowClosed(False)
+
 profile_data = None
 
 cloud_storage_path = io_global("read", "config", "cloud_storage_path")
@@ -984,8 +987,8 @@ if args.list:
             save_slot = profile_data.get('save_slot')
             print(f"{profile_id} - {name} - Save Slot: {save_slot}")
         sys.exit(1)
-elif args.runprofile:
 
+elif args.runprofile:
     profile_id_list = io_profile("read", None, "profile", "name", args.runprofile)
     if len(profile_id_list) > 1:
         print("Conflict: There are multiple profiles with the same name. Aborting.")
@@ -997,9 +1000,7 @@ elif args.runprofile:
     if not profile_id:
         print("The specified game profile does not exist in profiles.ini")
         sys.exit(1)
-    
     show_risk_warning_if_needed()
-
     check_and_sync_saves(profile_id)
     
 elif args.runid:
@@ -1009,17 +1010,12 @@ elif args.runid:
     if not os.path.exists(cloud_storage_path):
         print("Cloud storage path is invalid. Run the configuration tool to fix.")
         sys.exit(1)
-
     profile_id = args.runid
-    
     profile_fields = io_profile("read", profile_id)
-
     if not profile_fields:
         print("Profile ID not found. Aborting.")
         sys.exit(1)
-
     profile_fields = io_profile("read", profile_id, "profile")
-
     name = profile_fields.get("name")
     game_executable = profile_fields.get("game_executable")
     local_save_folder = profile_fields.get("local_save_folder")
@@ -1027,15 +1023,13 @@ elif args.runid:
     sync_mode = profile_fields.get("sync_mode")
     cloud_profile_folder = os.path.join(cloud_storage_path, f"{profile_id}")
 
-    #Profile validity code to go here]
+    # Profile validity code to go here
 
     show_risk_warning_if_needed()
-
     check_and_sync_saves(profile_id)
 
 elif args.go:
     read_write_mode = 'read' if args.go_modifier == 'list' else 'write'
-
     if args.go_field in ['process_tracking', 'process_name']:
         if args.go_field == 'process_tracking':
             if args.go_value.lower() not in ['true', 'false']:
@@ -1054,9 +1048,15 @@ elif args.upload:
         print("Error: -upload requires a profile ID")
         sys.exit(1)
 
+elif args.debug:
+    io_global("write", "config", "debug", args.debug)
+    if args.debug == "enable":
+        print('Debug print messages set to enabled')
+    elif args.debug == "disable":
+        print('Debug print messages set to disabled')
+    sys.exit(1)
+
 else:
     show_risk_warning_if_needed()
-
     show_config_dialog()
-    
 app.exec_()

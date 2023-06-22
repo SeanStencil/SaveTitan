@@ -66,7 +66,12 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
     profile_id = str(profile_id) if profile_id is not None else None
     section = str(section) if section is not None else None
     field = str(field) if field is not None else None
-    value = str(value) if value is not None else None
+
+    original_value = value
+    if isinstance(value, str):
+        if modifier == "remove":
+            value = value.lower()
+
     modifier = str(modifier) if modifier is not None else None
 
     if read_write_mode == "read":
@@ -170,12 +175,13 @@ def io_config(read_write_mode, config_file, section=None, field=None, value=None
     section = str(section) if section is not None else None
     field = str(field) if field is not None else None
 
-    original_value = value  # Keep the original value
+    original_value = value
     if isinstance(value, str):
-        value = value.lower()
-        if value == 'true':
+        if modifier == "remove":
+            value = value.lower()
+        if value.lower() == 'true':
             value = True
-        elif value == 'false':
+        elif value.lower() == 'false':
             value = False
 
     modifier = str(modifier).lower() if modifier is not None else None

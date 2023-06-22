@@ -343,7 +343,7 @@
      <x>0</x>
      <y>0</y>
      <width>671</width>
-     <height>26</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -351,6 +351,8 @@
      <string>File</string>
     </property>
     <addaction name="actionNew_Profile"/>
+    <addaction name="separator"/>
+    <addaction name="actionOpen_SaveTitan_Config_Folder"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -399,6 +401,11 @@
    </property>
    <property name="text">
     <string>Backup Manager</string>
+   </property>
+  </action>
+  <action name="actionOpen_SaveTitan_Config_Folder">
+   <property name="text">
+    <string>Open SaveTitan Config Folder</string>
    </property>
   </action>
  </widget>

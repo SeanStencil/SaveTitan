@@ -791,6 +791,11 @@ def show_config_dialog():
 
 
     # Function to open a local save location in file explorer
+    def open_savetitan_config_location():
+        QDesktopServices.openUrl(QUrl.fromLocalFile(user_config_file))
+
+
+    # Function to open a local save location in file explorer
     def open_local_save_location(profile_id):
         local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
         QDesktopServices.openUrl(QUrl.fromLocalFile(local_save_folder))
@@ -898,6 +903,7 @@ def show_config_dialog():
     configprofileView.selectionModel().currentChanged.connect(update_fields)
 
     dialog.actionNew_Profile.triggered.connect(add_profile)
+    dialog.actionOpen_SaveTitan_Config_Folder.triggered.connect(open_savetitan_config_location)
     dialog.actionExit.triggered.connect(dialog.close)
     dialog.actionAbout.triggered.connect(lambda: about_dialog(dialog))
 

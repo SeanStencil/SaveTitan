@@ -816,6 +816,7 @@ def show_config_dialog():
         )
         shortcut.SetPath(target)
         shortcut.SetArguments(arguments)
+        shortcut.SetWorkingDirectory(script_dir)
         if icon:
             shortcut.SetIconLocation(icon, 0)
         persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
@@ -837,7 +838,7 @@ def show_config_dialog():
 
         desktop_folder = os.path.join(os.path.expanduser('~'), 'Desktop')
         shortcut_path = os.path.join(desktop_folder, f'{profile_name}.lnk')
-        arguments = f'-runid {profile_id}'
+        arguments = f'--runid {profile_id}'
 
         game_executable = io_profile("read", profile_id, "profile", "game_executable")
         if not game_executable:

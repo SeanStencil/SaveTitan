@@ -20,6 +20,6 @@ if sys.platform == "win32":
         global_config_file = os.path.join(os.getenv('APPDATA'), "SaveTitan/global.json")
         game_overrides_config_file = os.path.join(script_dir, "game_overrides.json")
 else:
-    profiles_config_file = os.path.join(script_dir, "user/profiles")
+    user_config_file = os.path.join(script_dir, "user")
     global_config_file = os.path.join(script_dir, "global.json")
     game_overrides_config_file = os.path.join(script_dir, "game_overrides.json")

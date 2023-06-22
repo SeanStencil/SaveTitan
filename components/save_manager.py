@@ -19,7 +19,7 @@ global_config_file = paths.global_config_file
 
 
 # Function to open save management dialog
-def save_mgmt_dialog(profile_id):
+def open_save_bank_manager(profile_id):
     save_mgmt_dialog = uic.loadUi("ui/save_mgmt.ui")
     save_mgmt_dialog.setWindowFlags(save_mgmt_dialog.windowFlags() & ~Qt.WindowMaximizeButtonHint)
     save_mgmt_dialog.setFixedSize(save_mgmt_dialog.size())

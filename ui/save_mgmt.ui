@@ -23,7 +23,7 @@
    <enum>Qt::NoContextMenu</enum>
   </property>
   <property name="windowTitle">
-   <string>SaveTitan - Save Management</string>
+   <string>SaveTitan - Save Bank Manager</string>
   </property>
   <property name="sizeGripEnabled">
    <bool>false</bool>

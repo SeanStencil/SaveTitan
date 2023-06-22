@@ -18,7 +18,7 @@ from modules.misc import center_dialog_over_dialog
 
 from components.config_editor import ConfigEditorDialog
 
-from components.save_manager import save_mgmt_dialog
+from components.save_manager import open_save_bank_manager
 
 import modules.paths as paths
 script_dir = paths.script_dir
@@ -795,13 +795,13 @@ def show_config_dialog():
 
 
     # Function to open a local save location in file explorer
-    def open_local_save_location(profile_id):
+    def open_local_save_folder_location(profile_id):
         local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
         QDesktopServices.openUrl(QUrl.fromLocalFile(local_save_folder))
 
 
     # Function to open a cloud storage location in file explorer
-    def open_cloud_location_storage(profile_id):
+    def open_cloud_storage_folder_location(profile_id):
         cloud_storage_path = io_global("read", "config", "cloud_storage_path")
         folder_path = os.path.join(cloud_storage_path, profile_id)
         QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
@@ -863,10 +863,10 @@ def show_config_dialog():
     def context_menu(point):
         menu = QMenu()
 
-        open_local_save_action = QAction("Open Local Save", menu)
-        open_cloud_storage_action = QAction("Open Cloud Storage", menu)
+        open_local_save_folder_action = QAction("Open Local Save Folder", menu)
+        open_cloud_storage_folder_action = QAction("Open Cloud Storage Folder", menu)
         omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
-        open_save_mgmt_action = QAction("Open Save Manager", menu)
+        open_save_bank_manager_action = QAction("Open Save Bank Manager", menu)
         open_save_editor_action = QAction("Open Config Editor", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
@@ -878,10 +878,10 @@ def show_config_dialog():
         if index.isValid():
             selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][2]
 
-            open_local_save_action.triggered.connect(lambda: open_local_save_location(selected_profile_id))
-            open_cloud_storage_action.triggered.connect(lambda: open_cloud_location_storage(selected_profile_id))
+            open_local_save_folder_action.triggered.connect(lambda: open_local_save_folder_location(selected_profile_id))
+            open_cloud_storage_folder_action.triggered.connect(lambda: open_cloud_storage_folder_location(selected_profile_id))
             omit_files_from_sync_action.triggered.connect(lambda: omit_files_dialog(selected_profile_id))
-            open_save_mgmt_action.triggered.connect(lambda: save_mgmt_dialog(selected_profile_id))
+            open_save_bank_manager_action.triggered.connect(lambda: open_save_bank_manager(selected_profile_id))
             open_save_editor_action.triggered.connect(lambda: ConfigEditorDialog(selected_profile_id).exec_())
             open_save_editor_action.setEnabled(True)
             delete_profile_action.triggered.connect(lambda: remove_profile(selected_profile_id))
@@ -889,12 +889,12 @@ def show_config_dialog():
             if sys.platform == "win32":
                 create_shortcut_action.triggered.connect(lambda: create_shortcut_for_profile(selected_profile_id))
 
-            menu.addAction(open_local_save_action)
-            menu.addAction(open_cloud_storage_action)
+            menu.addAction(open_local_save_folder_action)
+            menu.addAction(open_cloud_storage_folder_action)
             menu.addSeparator()
             menu.addAction(omit_files_from_sync_action)
             menu.addSeparator()
-            menu.addAction(open_save_mgmt_action)
+            menu.addAction(open_save_bank_manager_action)
             menu.addAction(open_save_editor_action)
             menu.addSeparator()
             menu.addAction(delete_profile_action)

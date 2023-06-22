@@ -122,7 +122,6 @@ def check_and_sync_saves(profile_id):
                 
             # Result: Content and amount of files is identical - Action: Launch the game, upload when done
             else:
-                sync_diag.hide()
                 launch_game(profile_id)
 
         # Result: Files aren't identical - Action: Compare files to find latest timestamp

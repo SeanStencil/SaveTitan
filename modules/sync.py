@@ -21,6 +21,8 @@ from modules.io import io_savetitan
 from modules.io import copy_save_to_cloud
 from modules.io import copy_save_to_local
 
+from modules.notifications import send_notification
+
 import modules.paths as paths
 script_dir = paths.script_dir
 user_config_file = paths.user_config_file
@@ -214,29 +216,33 @@ def wait_for_process_to_finish(process_names):
 
 
 def launch_game(profile_id):
+    #Load Data Set
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
-
+    profile_name = io_profile("read", profile_id, "profile", "name")
     game_executable = io_profile("read", profile_id, "profile", "game_executable")
     profile_info_savetitan_path = os.path.join(cloud_storage_path, profile_id, "profile_into.savetitan")
+    game_filename = os.path.basename(game_executable)
+    process_names = io_go("read", game_filename, "process_name")
+    process_names = [game_filename] + (process_names if process_names is not None else [])
 
     if not check_permissions(game_executable, 'game executable', "execute"):
         return
 
     game_process = subprocess.Popen(game_executable)
     
-    game_filename = os.path.basename(game_executable)
-    
     if io_go("read", game_filename, "process_tracking") == False:
         upload_dialog(profile_id)
         sys.exit()
 
-    process_names = io_go("read", game_filename, "process_name")
-    process_names = [game_filename] + (process_names if process_names is not None else [])
-
     if wait_for_process_to_finish(process_names):
 
         def upload_and_exit():
-            copy_save_to_cloud(profile_id)
+            profile_name = io_profile("read", profile_id, "profile", "name")
+            result = copy_save_to_cloud(profile_id)
+            if result == None:
+                send_notification("SaveTitan", f"Sync for Profile ID: {profile_name} to cloud completed successfully.")
+            else:
+                send_notification("SaveTitan", f"Cloud sync failed: {result}")
             io_savetitan("write", profile_id, "profile", "checkout")
             sys.exit()
 

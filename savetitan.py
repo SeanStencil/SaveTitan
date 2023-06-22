@@ -4,7 +4,7 @@ import sys
 import glob
 import pythoncom
 
-from win32com.shell import shell, shellcon
+from win32com.shell import shell
 
 from PyQt5 import QtWidgets, uic, QtCore
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QInputDialog, QMenu, QAction, QDialog, QListWidgetItem, QLabel, QCheckBox, QPushButton, QVBoxLayout

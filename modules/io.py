@@ -16,6 +16,7 @@ user_config_file = paths.user_config_file
 global_config_file = paths.global_config_file
 game_overrides_config_file = paths.game_overrides_config_file
 
+
 # Generate a 6 character string for use for profile_id's
 def generate_id():
     characters = string.ascii_lowercase + string.digits
@@ -373,8 +374,8 @@ def copy_save_to_cloud(profile_id):
     cloud_profile_save_path = Path(cloud_storage_path) / profile_id / f"save{save_slot}"
 
     if not network_share_accessible():
-        return
-
+        return "Cloud path is inaccessible"
+    
     make_backup_copy(profile_id, "cloud_backup")
 
     for root, dirs, files in os.walk(local_save_folder):
@@ -394,6 +395,7 @@ def copy_save_to_cloud(profile_id):
             shutil.copy2(file_path, dest_path)
 
     print(f"Sync for Profile ID: {profile_id} to cloud completed successfully.")
+    return
 
 
 # Function to sync saves (Copy cloud saves to local storage)

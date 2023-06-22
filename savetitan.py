@@ -76,7 +76,8 @@ go_group.add_argument('--go_field', choices=['process_name', 'process_tracking']
 go_group.add_argument('--go_value', help='Go Value', nargs='?', default=None)
 
 args = parser.parse_args()
-args = parser.parse_args()
+
+print(args)
 
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 

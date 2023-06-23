@@ -21,6 +21,9 @@ global_config_file = paths.global_config_file
 game_overrides_config_file = paths.game_overrides_config_file
 python_exe_path = paths.python_exe_path
 
+with open('debug.log', 'w'):
+    pass
+
 
 class RiskWarningDialog(QDialog):
     def __init__(self, parent=None):

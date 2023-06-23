@@ -865,7 +865,7 @@ def show_config_dialog():
 
         open_local_save_folder_action = QAction("Open Local Save Folder", menu)
         open_cloud_storage_folder_action = QAction("Open Cloud Storage Folder", menu)
-        omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
+        omit_files_from_sync_action = QAction("Omit Files From Sync (Broken)", menu)
         open_save_bank_manager_action = QAction("Open Save Bank Manager", menu)
         open_save_editor_action = QAction("Open Config Editor", menu)
         delete_profile_action = QAction("Delete Profile", menu)
@@ -893,6 +893,7 @@ def show_config_dialog():
             menu.addAction(open_cloud_storage_folder_action)
             menu.addSeparator()
             menu.addAction(omit_files_from_sync_action)
+            omit_files_from_sync_action.setDisabled(True)
             menu.addSeparator()
             menu.addAction(open_save_bank_manager_action)
             menu.addAction(open_save_editor_action)

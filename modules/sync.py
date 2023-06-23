@@ -20,9 +20,8 @@ from modules.io import io_go
 from modules.io import io_savetitan
 from modules.io import copy_save_to_cloud
 from modules.io import copy_save_to_local
-
-from modules.notifications import send_notification
-from modules.notifications import debug_msg
+from modules.io import send_notification
+from modules.io import debug_msg
 
 import modules.paths as paths
 script_dir = paths.script_dir
@@ -206,50 +205,69 @@ def wait_for_process_to_finish(process_names):
         process_names = [process_names]
 
     while True:
-        matching_processes = [proc for proc in psutil.process_iter(['name', 'pid']) if proc.info['name'].lower() in map(str.lower, process_names)]
+        matching_processes = [proc for proc in psutil.process_iter(['name', 'pid', 'status']) 
+                              if proc.info['name'].lower() in map(str.lower, process_names) 
+                              and proc.info['status'] != 'zombie']
 
         if not matching_processes:
-
+            debug_msg(f"No matching processes found for: {process_names}")
             time.sleep(3)
 
-            matching_processes = [proc for proc in psutil.process_iter(['name', 'pid']) if proc.info['name'].lower() in map(str.lower, process_names)]
+            matching_processes = [proc for proc in psutil.process_iter(['name', 'pid', 'status']) 
+                                  if proc.info['name'].lower() in map(str.lower, process_names)
+                                  and proc.info['status'] != 'zombie']
+
             if not matching_processes:
                 debug_msg('Processes have finished.')
                 return True
             else:
                 debug_msg(f'Processes restarted with PID {matching_processes[0].info["pid"]}. Restarting tracking.')
+        else:
+            debug_msg(f'Matching processes still running: {matching_processes}')
 
         time.sleep(3)
 
 
 def launch_game(profile_id):
+    debug_msg("Launching game...")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     profile_data = io_profile("read", profile_id, "profile")
     profile_name = profile_data.get("name")
     game_executable = profile_data.get("game_executable")
 
+    debug_msg(f"Profile name: {profile_name}, Game executable: {game_executable}")
+
     game_filename = os.path.basename(game_executable)
     process_names = io_go("read", game_filename, "process_name")
     process_names = [game_filename] + (process_names if process_names else [])
-    
+
+    debug_msg(f"Process names: {process_names}")
+
     if not check_permissions(game_executable, 'game executable', "execute"):
         return
 
     game_process = subprocess.Popen(game_executable)
+
+    debug_msg("Game process started.")
     
     if io_go("read", game_filename, "process_tracking") == False:
+        debug_msg("Process tracking disabled. Opening upload dialog.")
         upload_dialog(profile_id)
         sys.exit()
 
     if wait_for_process_to_finish(process_names):
+        debug_msg("Game process has finished.")
 
         def upload_and_exit():
+            debug_msg("Starting cloud sync...")
             result = copy_save_to_cloud(profile_id)
 
             if result == None:
-                send_notification("SaveTitan", f"Sync for Profile ID: {profile_name} to cloud completed successfully.")
+                debug_msg("Cloud sync successful.")
+                send_notification("SaveTitan", f"Profile \"{profile_name}\" has synced to the cloud successfully.")
             else:
-                send_notification("SaveTitan", f"Cloud sync failed: {result}")
+                debug_msg(f"Cloud sync failed: {result}")
+                send_notification("SaveTitan", f"Profile \"{profile_name}\" has failed to sync to the cloud: {result}")
             
             io_savetitan("write", profile_id, "profile", "checkout")
             sys.exit()

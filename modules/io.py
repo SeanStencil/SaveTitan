@@ -368,7 +368,7 @@ def copy_save_to_cloud(profile_id):
     local_save_folder = profile_data.get("local_save_folder")
     save_slot = profile_data.get("save_slot")
     
-    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted") or []
 
     debug_msg(f"Local save folder: {local_save_folder}, Save slot: {save_slot}")
 
@@ -423,7 +423,7 @@ def copy_save_to_local(profile_id):
     local_save_folder = profile_data.get("local_save_folder")
     save_slot = profile_data.get("save_slot")
     
-    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted") or []
 
     debug_msg(f"Local save folder: {local_save_folder}, Save slot: {save_slot}")
 

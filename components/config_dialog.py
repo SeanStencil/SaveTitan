@@ -555,11 +555,11 @@ def show_config_dialog():
 
         omitted_files = io_profile("read", profile_id, "overrides", "omitted")
 
-        for file_path in omitted_files:
-            omit_files_dialog.listWidget.addItem(file_path)
-
-        if len(omitted_files) > 0:
-            omit_files_dialog.listWidget.setEnabled(True)
+        if omitted_files:
+            for file_path in omitted_files:
+                omit_files_dialog.listWidget.addItem(file_path)
+            if len(omitted_files) > 0:
+                omit_files_dialog.listWidget.setEnabled(True)
 
 
         def omit_files_add_file():

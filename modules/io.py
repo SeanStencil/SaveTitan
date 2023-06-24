@@ -360,6 +360,7 @@ def check_folder_mismatch(folder_a, folder_b, profile_id):
     return compare_dirs(comparison)
 
 
+# Function to sync saves (Copy local saves to cloud storage)
 def copy_save_to_cloud(profile_id):
     debug_msg("Starting cloud sync...")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
@@ -378,37 +379,41 @@ def copy_save_to_cloud(profile_id):
         return "Cloud path is inaccessible"
 
     debug_msg("Cloud path is accessible. Making backup copy...")
-    make_backup_copy(profile_id, "cloud_backup")
+    #make_backup_copy(profile_id, "cloud_backup")
 
     for root, dirs, files in os.walk(local_save_folder):
-        rel_path = os.path.relpath(root, local_save_folder)
-        cloud_path = os.path.join(cloud_profile_save_path, rel_path)
-
         for file in files:
             local_file = os.path.join(root, file)
-            cloud_file = os.path.join(cloud_path, file)
-            
-            rel_file_path = os.path.relpath(local_file, local_save_folder)
+            rel_path = os.path.relpath(local_file, local_save_folder)
+            cloud_file = os.path.join(cloud_profile_save_path, rel_path)
 
-            if rel_file_path in omitted_files:
+            if rel_path in omitted_files:
                 debug_msg(f"Skipping file because it's omitted: {local_file}")
                 continue
 
-            if not os.path.exists(cloud_file) or not cmp(local_file, cloud_file, shallow=False):
+            if not os.path.exists(cloud_file) or not filecmp.cmp(local_file, cloud_file, shallow=False):
                 debug_msg(f"Copying or overwriting file: {local_file} to {cloud_file}")
-                os.makedirs(cloud_path, exist_ok=True)
+                os.makedirs(os.path.dirname(cloud_file), exist_ok=True)
                 shutil.copy2(local_file, cloud_file)
 
-        if os.path.exists(cloud_path):
-            for file in os.listdir(cloud_path):
-                if file not in files:
-                    cloud_file = os.path.join(cloud_path, file)
-                    if os.path.isfile(cloud_file):
-                        debug_msg(f"Deleting file: {cloud_file}")
-                        os.remove(cloud_file)
-                    elif os.path.isdir(cloud_file):
-                        debug_msg(f"Deleting directory: {cloud_file}")
-                        shutil.rmtree(cloud_file)
+    for root, dirs, files in os.walk(cloud_profile_save_path, topdown=False):
+        for name in files:
+            cloud_file = os.path.join(root, name)
+            rel_path = os.path.relpath(cloud_file, cloud_profile_save_path)
+            local_file = os.path.join(local_save_folder, rel_path)
+
+            if not os.path.exists(local_file):
+                debug_msg(f"Deleting file: {cloud_file}")
+                os.remove(cloud_file)
+
+        for name in dirs:
+            cloud_dir = os.path.join(root, name)
+            rel_path = os.path.relpath(cloud_dir, cloud_profile_save_path)
+            local_dir = os.path.join(local_save_folder, rel_path)
+
+            if not os.path.exists(local_dir):
+                debug_msg(f"Deleting directory: {cloud_dir}")
+                shutil.rmtree(cloud_dir)
 
     debug_msg(f"Sync for Profile ID: {profile_id} to cloud completed successfully.")
     return
@@ -433,37 +438,41 @@ def copy_save_to_local(profile_id):
         return "Cloud path is inaccessible"
 
     debug_msg("Cloud path is accessible. Making backup copy...")
-    make_backup_copy(profile_id, "local_backup")
+    #make_backup_copy(profile_id, "local_backup")
 
     for root, dirs, files in os.walk(cloud_profile_save_path):
-        rel_path = os.path.relpath(root, cloud_profile_save_path)
-        local_path = os.path.join(local_save_folder, rel_path)
-
         for file in files:
             cloud_file = os.path.join(root, file)
-            local_file = os.path.join(local_path, file)
+            rel_path = os.path.relpath(cloud_file, cloud_profile_save_path)
+            local_file = os.path.join(local_save_folder, rel_path)
 
-            rel_file_path = os.path.relpath(cloud_file, cloud_profile_save_path)
-
-            if rel_file_path in omitted_files:
+            if rel_path in omitted_files:
                 debug_msg(f"Skipping file because it's omitted: {cloud_file}")
                 continue
 
-            if not os.path.exists(local_file) or not cmp(cloud_file, local_file, shallow=False):
+            if not os.path.exists(local_file) or not filecmp.cmp(local_file, cloud_file, shallow=False):
                 debug_msg(f"Copying or overwriting file: {cloud_file} to {local_file}")
-                os.makedirs(local_path, exist_ok=True)
+                os.makedirs(os.path.dirname(local_file), exist_ok=True)
                 shutil.copy2(cloud_file, local_file)
 
-        if os.path.exists(local_path):
-            for file in os.listdir(local_path):
-                if file not in files:
-                    local_file = os.path.join(local_path, file)
-                    if os.path.isfile(local_file):
-                        debug_msg(f"Deleting file: {local_file}")
-                        os.remove(local_file)
-                    elif os.path.isdir(local_file):
-                        debug_msg(f"Deleting directory: {local_file}")
-                        shutil.rmtree(local_file)
+    for root, dirs, files in os.walk(local_save_folder, topdown=False):
+        for name in files:
+            local_file = os.path.join(root, name)
+            rel_path = os.path.relpath(local_file, local_save_folder)
+            cloud_file = os.path.join(cloud_profile_save_path, rel_path)
+
+            if not os.path.exists(cloud_file):
+                debug_msg(f"Deleting file: {local_file}")
+                os.remove(local_file)
+
+        for name in dirs:
+            local_dir = os.path.join(root, name)
+            rel_path = os.path.relpath(local_dir, local_save_folder)
+            cloud_dir = os.path.join(cloud_profile_save_path, rel_path)
+
+            if not os.path.exists(cloud_dir):
+                debug_msg(f"Deleting directory: {local_dir}")
+                shutil.rmtree(local_dir)
 
     debug_msg(f"Sync for Profile ID: {profile_id} to local completed successfully.")
     return
@@ -474,20 +483,20 @@ def make_backup_copy(profile_id, which_side):
     debug_msg("Starting backup process...")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
     save_slot = io_profile("read", profile_id, "profile", "save_slot")
-    cloud_profile_folder_save = os.path.join(cloud_storage_path, profile_id + "/save" + save_slot)
-    cloud_profile_folder_save_bak = cloud_profile_folder_save + ".bak"
+    cloud_profile_folder_save = os.path.join(cloud_storage_path, profile_id, f"save{save_slot}")
+    cloud_profile_folder_save_bak = f"{cloud_profile_folder_save}.bak"
 
     if which_side not in ["local_backup", "cloud_backup"]:
         raise Exception("Invalid which_side argument")
+
+    if os.path.exists(cloud_profile_folder_save_bak):
+        debug_msg(f"Deleting existing backup: {cloud_profile_folder_save_bak}")
+        shutil.rmtree(cloud_profile_folder_save_bak)
 
     os.makedirs(cloud_profile_folder_save_bak, exist_ok=True)
 
     if which_side == "local_backup":
         local_save_folder = io_profile("read", profile_id, "profile", "local_save_folder")
-        
-        if os.path.exists(cloud_profile_folder_save_bak):
-            shutil.rmtree(cloud_profile_folder_save_bak)
-        
         debug_msg("Performing local backup...")
         for root, dirs, files in os.walk(local_save_folder):
             rel_path = os.path.relpath(root, local_save_folder)
@@ -502,9 +511,6 @@ def make_backup_copy(profile_id, which_side):
                 shutil.copy2(local_file, backup_file)
 
     elif which_side == "cloud_backup":
-        if os.path.exists(cloud_profile_folder_save_bak):
-            shutil.rmtree(cloud_profile_folder_save_bak)
-
         debug_msg("Performing cloud backup...")
         for root, dirs, files in os.walk(cloud_profile_folder_save):
             rel_path = os.path.relpath(root, cloud_profile_folder_save)

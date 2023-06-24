@@ -156,9 +156,10 @@ def io_profile(read_write_mode, profile_id=None, section=None, field=None, value
                 current_value = [current_value] if current_value else []
             current_value.append(value)
         elif modifier == "remove":
-            if isinstance(current_value, list) and value in current_value:
-                current_value.remove(value)
-            elif not isinstance(current_value, list) and current_value == value:
+            if isinstance(current_value, list):
+                if value in map(str.lower, current_value):
+                    current_value.remove(next(item for item in current_value if item.lower() == value))
+            elif not isinstance(current_value, list) and current_value.lower() == value:
                 current_value = None
         else:
             current_value = value if value is not None else ""
@@ -226,7 +227,8 @@ def io_config(read_write_mode, config_file, section=None, field=None, value=None
                 current_value.append(original_value)
         elif modifier == "remove":
             if isinstance(current_value, list):
-                current_value = [item for item in current_value if str(item).lower() != value]
+                if value in map(str.lower, current_value):
+                    current_value.remove(next(item for item in current_value if item.lower() == value))
             elif not isinstance(current_value, list) and str(current_value).lower() == value:
                 current_value = None
         else:
@@ -358,7 +360,6 @@ def check_folder_mismatch(folder_a, folder_b, profile_id):
     return compare_dirs(comparison)
 
 
-# Function to sync saves (Copy cloud saves to local storage)
 def copy_save_to_cloud(profile_id):
     debug_msg("Starting cloud sync...")
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
@@ -366,6 +367,8 @@ def copy_save_to_cloud(profile_id):
     profile_data = io_profile("read", profile_id, "profile")
     local_save_folder = profile_data.get("local_save_folder")
     save_slot = profile_data.get("save_slot")
+    
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
 
     debug_msg(f"Local save folder: {local_save_folder}, Save slot: {save_slot}")
 
@@ -381,17 +384,21 @@ def copy_save_to_cloud(profile_id):
         rel_path = os.path.relpath(root, local_save_folder)
         cloud_path = os.path.join(cloud_profile_save_path, rel_path)
 
-        # Copy or overwrite files that exist in the source but not in the destination or are different
         for file in files:
             local_file = os.path.join(root, file)
             cloud_file = os.path.join(cloud_path, file)
+            
+            rel_file_path = os.path.relpath(local_file, local_save_folder)
+
+            if rel_file_path in omitted_files:
+                debug_msg(f"Skipping file because it's omitted: {local_file}")
+                continue
 
             if not os.path.exists(cloud_file) or not cmp(local_file, cloud_file, shallow=False):
                 debug_msg(f"Copying or overwriting file: {local_file} to {cloud_file}")
                 os.makedirs(cloud_path, exist_ok=True)
                 shutil.copy2(local_file, cloud_file)
 
-        # Delete files that exist in the destination but not in the source
         if os.path.exists(cloud_path):
             for file in os.listdir(cloud_path):
                 if file not in files:
@@ -415,6 +422,8 @@ def copy_save_to_local(profile_id):
     profile_data = io_profile("read", profile_id, "profile")
     local_save_folder = profile_data.get("local_save_folder")
     save_slot = profile_data.get("save_slot")
+    
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
 
     debug_msg(f"Local save folder: {local_save_folder}, Save slot: {save_slot}")
 
@@ -430,17 +439,21 @@ def copy_save_to_local(profile_id):
         rel_path = os.path.relpath(root, cloud_profile_save_path)
         local_path = os.path.join(local_save_folder, rel_path)
 
-        # Copy or overwrite files that exist in the source but not in the destination or are different
         for file in files:
             cloud_file = os.path.join(root, file)
             local_file = os.path.join(local_path, file)
+
+            rel_file_path = os.path.relpath(cloud_file, cloud_profile_save_path)
+
+            if rel_file_path in omitted_files:
+                debug_msg(f"Skipping file because it's omitted: {cloud_file}")
+                continue
 
             if not os.path.exists(local_file) or not cmp(cloud_file, local_file, shallow=False):
                 debug_msg(f"Copying or overwriting file: {cloud_file} to {local_file}")
                 os.makedirs(local_path, exist_ok=True)
                 shutil.copy2(cloud_file, local_file)
 
-        # Delete files that exist in the destination but not in the source
         if os.path.exists(local_path):
             for file in os.listdir(local_path):
                 if file not in files:
@@ -480,7 +493,6 @@ def make_backup_copy(profile_id, which_side):
             rel_path = os.path.relpath(root, local_save_folder)
             backup_path = os.path.join(cloud_profile_folder_save_bak, rel_path)
 
-            # Copy or overwrite files
             for file in files:
                 local_file = os.path.join(root, file)
                 backup_file = os.path.join(backup_path, file)
@@ -498,7 +510,6 @@ def make_backup_copy(profile_id, which_side):
             rel_path = os.path.relpath(root, cloud_profile_folder_save)
             backup_path = os.path.join(cloud_profile_folder_save_bak, rel_path)
 
-            # Copy or overwrite files
             for file in files:
                 cloud_file = os.path.join(root, file)
                 backup_file = os.path.join(backup_path, file)

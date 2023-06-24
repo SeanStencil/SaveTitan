@@ -47,8 +47,7 @@ def check_and_sync_saves(profile_id):
     sync_mode = profile_fields.get("sync_mode")
 
     # Read omitted files
-    omitted_files_str = io_profile("read", profile_id, "overrides", "omitted") or ""
-    omitted_files = [os.path.normpath(f.strip()) for f in omitted_files_str.split(",") if f.strip()]
+    omitted_files = io_profile("read", profile_id, "overrides", "omitted") or []
 
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id, "save" + save_slot)
 
@@ -86,15 +85,16 @@ def check_and_sync_saves(profile_id):
                 local_file = os.path.join(dirpath, filename)
 
                 # Check: Skip omitted files
-                local_file = os.path.normpath(str(Path(local_file)))
-                if local_file in omitted_files:
+                rel_file_path = os.path.relpath(local_file, local_save_folder)
+
+                if rel_file_path in omitted_files:
                     continue
 
                 cloud_file = os.path.join(cloud_profile_save_path, os.path.relpath(local_file, local_save_folder))
                 if os.path.exists(cloud_file):
-                    # Skip omitted cloud files
-                    cloud_file = os.path.normpath(str(Path(cloud_file)))
-                    if cloud_file in omitted_files:
+                    rel_cloud_file_path = os.path.relpath(cloud_file, cloud_profile_save_path)
+
+                    if rel_cloud_file_path in omitted_files:
                         continue
                     if not filecmp.cmp(local_file, cloud_file, shallow=False):
                         files_identical = False
@@ -133,9 +133,11 @@ def check_and_sync_saves(profile_id):
             for dirpath, dirnames, filenames in os.walk(local_save_folder):
                 for filename in filenames:
                     local_file = os.path.join(dirpath, filename)
-                    # Skip omitted files                    
-                    local_file_norm = os.path.normpath(str(Path(local_file)))
-                    if local_file_norm in omitted_files:
+
+                    # Check: Skip omitted files
+                    rel_file_path = os.path.relpath(local_file, local_save_folder)
+
+                    if rel_file_path in omitted_files:
                         continue
 
                     file_time = datetime.fromtimestamp(os.path.getmtime(os.path.join(dirpath, filename)))

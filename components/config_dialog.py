@@ -554,13 +554,13 @@ def show_config_dialog():
         omit_files_dialog.listWidget.setEnabled(False)
 
         omitted_files = io_profile("read", profile_id, "overrides", "omitted")
-        omitted_files = omitted_files.split(",") if omitted_files else []
 
         for file_path in omitted_files:
             omit_files_dialog.listWidget.addItem(file_path)
 
         if len(omitted_files) > 0:
             omit_files_dialog.listWidget.setEnabled(True)
+
 
         def omit_files_add_file():
             file_dialog = QFileDialog()
@@ -571,13 +571,11 @@ def show_config_dialog():
                 local_folder_path = os.path.normpath(os.path.abspath(local_save_folder))
 
                 if os.path.commonpath([local_folder_path, file_path]) == local_folder_path:
-                    omitted_files = io_profile("read", profile_id, "overrides", "omitted")
-                    omitted_files = omitted_files.split(",") if omitted_files else []
-                    omitted_files.append(file_path)
+                    relative_path = os.path.relpath(file_path, local_folder_path)
 
-                    io_profile("write", profile_id, "overrides", "omitted", ",".join(omitted_files))
+                    io_profile("write", profile_id, "overrides", "omitted", relative_path, "add")
                     omit_files_dialog.listWidget.setEnabled(True)
-                    omit_files_dialog.listWidget.addItem(file_path)
+                    omit_files_dialog.listWidget.addItem(relative_path)
                 else:
                     QMessageBox.warning(None, "Invalid Path", "Selected file should be within the local save folder.")
 
@@ -591,12 +589,12 @@ def show_config_dialog():
                 if confirm_msg == QMessageBox.Yes:
                     selected_file = selected_item.text()
                     omitted_files = io_profile("read", profile_id, "overrides", "omitted")
-                    omitted_files = omitted_files.split(",") if omitted_files else []
 
                     if selected_file in omitted_files:
-                        omitted_files.remove(selected_file)
-                        io_profile("write", profile_id, "overrides", "omitted", ",".join(omitted_files))
+                        io_profile("write", profile_id, "overrides", "omitted", selected_file, "remove")
                         omit_files_dialog.listWidget.takeItem(omit_files_dialog.listWidget.row(selected_item))
+                        
+                        omitted_files = io_profile("read", profile_id, "overrides", "omitted")
                         if len(omitted_files) == 0:
                             omit_files_dialog.listWidget.setEnabled(False)
 
@@ -865,7 +863,7 @@ def show_config_dialog():
 
         open_local_save_folder_action = QAction("Open Local Save Folder", menu)
         open_cloud_storage_folder_action = QAction("Open Cloud Storage Folder", menu)
-        omit_files_from_sync_action = QAction("Omit Files From Sync (Broken)", menu)
+        omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
         open_save_bank_manager_action = QAction("Open Save Bank Manager", menu)
         open_save_editor_action = QAction("Open Config Editor", menu)
         delete_profile_action = QAction("Delete Profile", menu)
@@ -893,7 +891,6 @@ def show_config_dialog():
             menu.addAction(open_cloud_storage_folder_action)
             menu.addSeparator()
             menu.addAction(omit_files_from_sync_action)
-            omit_files_from_sync_action.setDisabled(True)
             menu.addSeparator()
             menu.addAction(open_save_bank_manager_action)
             menu.addAction(open_save_editor_action)

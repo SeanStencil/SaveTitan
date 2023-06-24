@@ -527,18 +527,18 @@ def make_backup_copy(profile_id, which_side):
     debug_msg("Backup process completed.")
 
 
-def send_notification(title, message):
+def send_notification(message):
     import sys
     if sys.platform == "win32":
         from plyer import notification
-        notification.notify(title=title, message=message)
+        notification.notify(title="SaveTitan", message=message)
     elif sys.platform == "darwin":
         from pync import Notifier
-        Notifier.notify(message, title=title)
+        Notifier.notify(message, title="SaveTitan")
     elif sys.platform.startswith("linux"):
         import notify2
-        notify2.init('SaveTitan')
-        notification = notify2.Notification(title, message)
+        notify2.init("SaveTitan")
+        notification = notify2.Notification("SaveTitan", message)
         notification.show()
 
 

@@ -40,7 +40,7 @@ def check_and_sync_saves(profile_id):
 
     platform_flag = 1 if sys.platform == 'win32' else None
  
-    name = profile_fields.get("name")
+    profile_name = profile_fields.get("name")
     game_executable = profile_fields.get("game_executable")
     local_save_folder = profile_fields.get("local_save_folder")
     save_slot = profile_fields.get("save_slot")
@@ -112,17 +112,18 @@ def check_and_sync_saves(profile_id):
             
             # Result: More local files than cloud - Action: Copy contents of local folder to cloud
             if local_files_count > cloud_files_count:
-                sync_diag.hide()
+                send_notification(f"Save is up to date. Launching \"{profile_name}\".")
                 launch_game(profile_id)
                 
             # Result: More cloud files than local - Action: Copy contents of cloud folder to local
             elif cloud_files_count > local_files_count:
                 copy_save_to_local(profile_id)
-                sync_diag.hide()
+                send_notification(f"Save is up to date. Launching \"{profile_name}\".")
                 launch_game(profile_id)
                 
             # Result: Content and amount of files is identical - Action: Launch the game, upload when done
             else:
+                send_notification(f"Save is up to date. Launching \"{profile_name}\".")
                 launch_game(profile_id)
 
         # Result: Files aren't identical - Action: Compare files to find latest timestamp
@@ -266,10 +267,10 @@ def launch_game(profile_id):
 
             if result == None:
                 debug_msg("Cloud sync successful.")
-                send_notification("SaveTitan", f"Profile \"{profile_name}\" has synced to the cloud successfully.")
+                send_notification(f"Profile \"{profile_name}\" has synced to the cloud successfully.")
             else:
                 debug_msg(f"Cloud sync failed: {result}")
-                send_notification("SaveTitan", f"Profile \"{profile_name}\" has failed to sync to the cloud: {result}")
+                send_notification(f"Profile \"{profile_name}\" has failed to sync to the cloud: {result}")
             
             io_savetitan("write", profile_id, "profile", "checkout")
             sys.exit()

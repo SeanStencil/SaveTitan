@@ -163,9 +163,9 @@
     <widget class="QPushButton" name="applyButton">
      <property name="geometry">
       <rect>
-       <x>570</x>
+       <x>560</x>
        <y>170</y>
-       <width>71</width>
+       <width>81</width>
        <height>23</height>
       </rect>
      </property>
@@ -250,7 +250,7 @@
      <rect>
       <x>90</x>
       <y>10</y>
-      <width>71</width>
+      <width>81</width>
       <height>23</height>
      </rect>
     </property>
@@ -259,11 +259,14 @@
     </property>
    </widget>
    <widget class="QPushButton" name="syncButton">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>280</x>
       <y>10</y>
-      <width>71</width>
+      <width>81</width>
       <height>23</height>
      </rect>
     </property>
@@ -329,11 +332,40 @@
       <x>490</x>
       <y>10</y>
       <width>171</width>
-      <height>20</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="placeholderText">
      <string>filter</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="launch_gameButton">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>190</x>
+      <y>10</y>
+      <width>81</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Launch Game</string>
+    </property>
+   </widget>
+   <widget class="Line" name="line">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>10</y>
+      <width>20</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Vertical</enum>
     </property>
    </widget>
   </widget>

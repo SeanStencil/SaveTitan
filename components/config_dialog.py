@@ -778,13 +778,21 @@ def show_config_dialog():
         QMessageBox.information(None, "Profile Saved", "The profile has been successfully saved.")
 
 
+    # Functions for button clicks
+    #def on_sync_button_clicked():
+    #    index = configprofileView.indexAt(point)
+    #    if index.isValid():
+    #        profile_id = configprofileView.model().sourceModel()._data[index.row()][2]
+    #        check_and_sync_saves(profile_id, False)
+
+    
     # Connections for button clicks
     dialog.executablefieldButton.clicked.connect(update_executable)
     dialog.savefieldButton.clicked.connect(update_local_save_folder)
     dialog.addButton.clicked.connect(add_profile)
     dialog.removeButton.clicked.connect(remove_profile)
     dialog.importButton.clicked.connect(import_profile_dialog)
-    dialog.syncButton.clicked.connect(lambda: check_and_sync_saves(selected_profile_id, False))
+    #dialog.syncButton.clicked.connect(on_sync_button_clicked)
     dialog.applyButton.clicked.connect(save_profile_fields)
 
 
@@ -862,12 +870,13 @@ def show_config_dialog():
     def context_menu(point):
         menu = QMenu()
 
+        open_launch_game_action = QAction("Launch game", menu)
         open_sync_action = QAction("Sync Save Folder", menu)
         open_local_save_folder_action = QAction("Open Local Save Folder", menu)
         open_cloud_storage_folder_action = QAction("Open Cloud Storage Folder", menu)
-        omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
-        open_save_bank_manager_action = QAction("Open Save Bank Manager", menu)
-        open_save_editor_action = QAction("Open Config Editor", menu)
+        open_omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
+        open_save_bank_manager_action = QAction("Save Bank Manager", menu)
+        open_save_editor_action = QAction("Config Editor", menu)
         delete_profile_action = QAction("Delete Profile", menu)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
         if sys.platform == "win32":
@@ -878,10 +887,11 @@ def show_config_dialog():
         if index.isValid():
             selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][2]
 
+            #open_launch_game_action.triggered.connect()
             open_sync_action.triggered.connect(lambda: check_and_sync_saves(selected_profile_id, False))
             open_local_save_folder_action.triggered.connect(lambda: open_local_save_folder_location(selected_profile_id))
             open_cloud_storage_folder_action.triggered.connect(lambda: open_cloud_storage_folder_location(selected_profile_id))
-            omit_files_from_sync_action.triggered.connect(lambda: omit_files_dialog(selected_profile_id))
+            open_omit_files_from_sync_action.triggered.connect(lambda: omit_files_dialog(selected_profile_id))
             open_save_bank_manager_action.triggered.connect(lambda: open_save_bank_manager(selected_profile_id))
             open_save_editor_action.triggered.connect(lambda: ConfigEditorDialog(selected_profile_id).exec_())
             open_save_editor_action.setEnabled(True)
@@ -890,12 +900,14 @@ def show_config_dialog():
             if sys.platform == "win32":
                 create_shortcut_action.triggered.connect(lambda: create_shortcut_for_profile(selected_profile_id))
 
+            menu.addAction(open_launch_game_action)
+            open_launch_game_action.setDisabled(True)
             menu.addAction(open_sync_action)
             menu.addSeparator()
             menu.addAction(open_local_save_folder_action)
             menu.addAction(open_cloud_storage_folder_action)
             menu.addSeparator()
-            menu.addAction(omit_files_from_sync_action)
+            menu.addAction(open_omit_files_from_sync_action)
             menu.addSeparator()
             menu.addAction(open_save_bank_manager_action)
             menu.addAction(open_save_editor_action)

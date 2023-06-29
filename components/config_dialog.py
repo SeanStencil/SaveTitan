@@ -16,6 +16,8 @@ from modules.io import io_savetitan
 
 from modules.misc import center_dialog_over_dialog
 
+from modules.sync import check_and_sync_saves
+
 from components.config_editor import ConfigEditorDialog
 
 from components.save_manager import open_save_bank_manager
@@ -860,6 +862,7 @@ def show_config_dialog():
     def context_menu(point):
         menu = QMenu()
 
+        open_sync_action = QAction("Sync Save Folder", menu)
         open_local_save_folder_action = QAction("Open Local Save Folder", menu)
         open_cloud_storage_folder_action = QAction("Open Cloud Storage Folder", menu)
         omit_files_from_sync_action = QAction("Omit Files From Sync", menu)
@@ -868,13 +871,14 @@ def show_config_dialog():
         delete_profile_action = QAction("Delete Profile", menu)
         copy_profile_id_action = QAction("Copy Profile ID", menu)
         if sys.platform == "win32":
-            create_shortcut_action = QAction("Create Shortcut", menu)
+            create_shortcut_action = QAction("Create Auto-Sync Shortcut (Experimental)", menu)
 
         index = configprofileView.indexAt(point)
         
         if index.isValid():
             selected_profile_id = configprofileView.model().sourceModel()._data[index.row()][2]
 
+            open_sync_action.triggered.connect(lambda: check_and_sync_saves(selected_profile_id, False))
             open_local_save_folder_action.triggered.connect(lambda: open_local_save_folder_location(selected_profile_id))
             open_cloud_storage_folder_action.triggered.connect(lambda: open_cloud_storage_folder_location(selected_profile_id))
             omit_files_from_sync_action.triggered.connect(lambda: omit_files_dialog(selected_profile_id))
@@ -886,6 +890,8 @@ def show_config_dialog():
             if sys.platform == "win32":
                 create_shortcut_action.triggered.connect(lambda: create_shortcut_for_profile(selected_profile_id))
 
+            menu.addAction(open_sync_action)
+            menu.addSeparator()
             menu.addAction(open_local_save_folder_action)
             menu.addAction(open_cloud_storage_folder_action)
             menu.addSeparator()
@@ -898,6 +904,7 @@ def show_config_dialog():
             menu.addSeparator()
             menu.addAction(copy_profile_id_action)
             if sys.platform == "win32":
+                menu.addSeparator()
                 menu.addAction(create_shortcut_action)
 
             menu.exec_(configprofileView.viewport().mapToGlobal(point))

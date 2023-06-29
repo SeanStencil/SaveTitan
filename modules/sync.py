@@ -32,7 +32,7 @@ python_exe_path = paths.python_exe_path
 
 
 # Function to check and sync saves
-def check_and_sync_saves(profile_id):
+def check_and_sync_saves(profile_id, launch_game_bool=True):
     #Load data set
     cloud_storage_path = io_global("read", "config", "cloud_storage_path")
 
@@ -52,7 +52,8 @@ def check_and_sync_saves(profile_id):
     cloud_profile_save_path = os.path.join(cloud_storage_path, profile_id, "save" + save_slot)
 
     if sync_mode != "Sync":
-        launch_game_without_sync(game_executable)
+        if launch_game_bool:
+            launch_game_without_sync(game_executable)
         return
 
     # Check: Checkout Hostname
@@ -71,7 +72,10 @@ def check_and_sync_saves(profile_id):
         result = checkout_msgbox.exec_()
 
         if result == -1 or checkout_msgbox.clickedButton() == no_button:
-            sys.exit()
+            if launch_game_bool:
+                sys.exit()
+            else:
+                return
         elif checkout_msgbox.clickedButton() == yes_button:
             io_savetitan("write", profile_id, "profile", "checkout", checkout_current_user)
 
@@ -112,19 +116,28 @@ def check_and_sync_saves(profile_id):
             
             # Result: More local files than cloud - Action: Copy contents of local folder to cloud
             if local_files_count > cloud_files_count:
-                send_notification(f"Save is up to date. Launching \"{profile_name}\".")
-                launch_game(profile_id)
+                if launch_game_bool:
+                    send_notification(f"Save is up to date. Launching \"{profile_name}\".")
+                    launch_game(profile_id)
+                else:
+                    send_notification(f"Save is up to date for \"{profile_name}\". No changes made.")
                 
             # Result: More cloud files than local - Action: Copy contents of cloud folder to local
             elif cloud_files_count > local_files_count:
                 copy_save_to_local(profile_id)
-                send_notification(f"Save is up to date. Launching \"{profile_name}\".")
-                launch_game(profile_id)
+                if launch_game_bool:
+                    send_notification(f"Save is up to date. Launching \"{profile_name}\".")
+                    launch_game(profile_id)
+                else:
+                    send_notification(f"Save is up to date for \"{profile_name}\". No changes made.")
                 
             # Result: Content and amount of files is identical - Action: Launch the game, upload when done
             else:
-                send_notification(f"Save is up to date. Launching \"{profile_name}\".")
-                launch_game(profile_id)
+                if launch_game_bool:
+                    send_notification(f"Save is up to date. Launching \"{profile_name}\".")
+                    launch_game(profile_id)
+                else:
+                    send_notification(f"Save is up to date for \"{profile_name}\". No changes made.")
 
         # Result: Files aren't identical - Action: Compare files to find latest timestamp
         else:
@@ -181,25 +194,70 @@ def check_and_sync_saves(profile_id):
                 sync_diag.local_indication.setText("Local Copy: Newer")
                 sync_diag.cloud_indication.setText("Cloud Copy: Older")
 
+
             def on_nosyncButton_clicked():
                 executable_path = io_profile("read", profile_id, "profile", "game_executable")
                 io_savetitan("write", profile_id, "profile", "checkout")
                 sync_diag.hide
-                launch_game_without_sync(executable_path)
-            
+                if launch_game_bool:
+                    launch_game_without_sync(executable_path)
+
+
             def on_rejected_connect():
                 io_savetitan("write", profile_id, "profile", "checkout")
-                sys.exit()
+                if launch_game_bool:
+                    sys.exit()
+                else:
+                    return
 
-            sync_diag.downloadButton.clicked.connect(lambda: [sync_diag.hide(), copy_save_to_local(profile_id), launch_game(profile_id)])
-            sync_diag.uploadButton.clicked.connect(lambda: [sync_diag.hide(), launch_game(profile_id)])
+
+            def handle_upload_button_click():
+                sync_diag.hide()
+                
+                if launch_game_bool:
+                    launch_game(profile_id)
+                else:
+                    result = copy_save_to_cloud(profile_id)
+                    profile_fields = io_profile("read", profile_id, "profile")
+                    profile_name = profile_fields.get("name")
+
+                    if result is None:
+                        debug_msg("Cloud sync successful.")
+                        send_notification(f"Profile \"{profile_name}\" has synced to the cloud successfully.")
+                    else:
+                        debug_msg(f"Cloud sync failed: {result}")
+                        send_notification(f"Profile \"{profile_name}\" has failed to sync to the cloud: {result}")
+
+
+            def handle_download_button_click():
+                sync_diag.hide()
+                result = copy_save_to_local(profile_id)
+                
+                if launch_game_bool:
+                    launch_game(profile_id)
+                else:
+                    profile_fields = io_profile("read", profile_id, "profile")
+                    profile_name = profile_fields.get("name")
+
+                    if result is None:
+                        debug_msg("Local sync successful.")
+                        send_notification(f"Profile \"{profile_name}\" has synced the cloud save to local successfully.")
+                    else:
+                        debug_msg(f"Local sync failed: {result}")
+                        send_notification(f"Profile \"{profile_name}\" has failed to sync the cloud save to local: {result}")
+
+            sync_diag.downloadButton.clicked.connect(handle_download_button_click)
+            sync_diag.uploadButton.clicked.connect(handle_upload_button_click)
             sync_diag.nosyncButton.clicked.connect(lambda: [on_nosyncButton_clicked()])
-
             sync_diag.rejected.connect(lambda: on_rejected_connect())
             
             sync_diag.exec_()
     else:
-        launch_game(profile_id)
+        if launch_game_bool:
+            launch_game(profile_id)
+        else:
+            send_notification(f"Save is up to date for \"{profile_name}\". No changes made.")
+            return
 
 
 # Function to wait for a process and its children to finish
@@ -214,7 +272,7 @@ def wait_for_process_to_finish(process_names):
 
         if not matching_processes:
             debug_msg(f"No matching processes found for: {process_names}")
-            time.sleep(3)
+            time.sleep(2)
 
             matching_processes = [proc for proc in psutil.process_iter(['name', 'pid', 'status']) 
                                   if proc.info['name'].lower() in map(str.lower, process_names)
@@ -228,7 +286,7 @@ def wait_for_process_to_finish(process_names):
         else:
             debug_msg(f'Matching processes still running: {matching_processes}')
 
-        time.sleep(3)
+        time.sleep(2)
 
 
 def launch_game(profile_id):

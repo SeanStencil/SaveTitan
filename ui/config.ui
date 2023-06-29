@@ -224,7 +224,7 @@
      <rect>
       <x>10</x>
       <y>10</y>
-      <width>75</width>
+      <width>31</width>
       <height>23</height>
      </rect>
     </property>
@@ -235,9 +235,9 @@
    <widget class="QPushButton" name="removeButton">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>50</x>
       <y>10</y>
-      <width>75</width>
+      <width>31</width>
       <height>23</height>
      </rect>
     </property>
@@ -248,9 +248,9 @@
    <widget class="QPushButton" name="importButton">
     <property name="geometry">
      <rect>
-      <x>170</x>
+      <x>90</x>
       <y>10</y>
-      <width>75</width>
+      <width>71</width>
       <height>23</height>
      </rect>
     </property>
@@ -258,17 +258,17 @@
      <string>Import</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="settingsButton">
+   <widget class="QPushButton" name="syncButton">
     <property name="geometry">
      <rect>
-      <x>250</x>
+      <x>170</x>
       <y>10</y>
-      <width>75</width>
+      <width>71</width>
       <height>23</height>
      </rect>
     </property>
     <property name="text">
-     <string>Settings</string>
+     <string>Sync Save</string>
     </property>
    </widget>
    <widget class="QTableView" name="configprofileView">
@@ -354,6 +354,8 @@
     <addaction name="separator"/>
     <addaction name="actionOpen_SaveTitan_Config_Folder"/>
     <addaction name="separator"/>
+    <addaction name="actionSettings"/>
+    <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -406,6 +408,11 @@
   <action name="actionOpen_SaveTitan_Config_Folder">
    <property name="text">
     <string>Open SaveTitan Config Folder</string>
+   </property>
+  </action>
+  <action name="actionSettings">
+   <property name="text">
+    <string>Settings</string>
    </property>
   </action>
  </widget>

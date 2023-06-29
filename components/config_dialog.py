@@ -784,7 +784,7 @@ def show_config_dialog():
     dialog.addButton.clicked.connect(add_profile)
     dialog.removeButton.clicked.connect(remove_profile)
     dialog.importButton.clicked.connect(import_profile_dialog)
-    dialog.settingsButton.clicked.connect(global_settings_dialog)
+    dialog.syncButton.clicked.connect(lambda: check_and_sync_saves(selected_profile_id, False))
     dialog.applyButton.clicked.connect(save_profile_fields)
 
 
@@ -916,6 +916,7 @@ def show_config_dialog():
     configprofileView.selectionModel().currentChanged.connect(update_fields)
 
     dialog.actionNew_Profile.triggered.connect(add_profile)
+    dialog.actionSettings.triggered.connect(global_settings_dialog)
     dialog.actionOpen_SaveTitan_Config_Folder.triggered.connect(open_savetitan_config_location)
     dialog.actionExit.triggered.connect(dialog.close)
     dialog.actionAbout.triggered.connect(lambda: about_dialog(dialog))

@@ -184,9 +184,8 @@ def check_and_sync_saves(profile_id, launch_game_bool=True):
             sync_diag.cloud_date.setText(cloud_save_time_str)
 
             config_profiles = io_profile("read", profile_id, "profile")
-            game_name = config_profiles.get(profile_id, 'name')
 
-            sync_diag.setWindowTitle(game_name)
+            sync_diag.setWindowTitle(f"Profile: {profile_name}")
             if cloud_file_time > local_file_time:
                 sync_diag.local_indication.setText("Local Copy: Older")
                 sync_diag.cloud_indication.setText("Cloud Copy: Newer")
